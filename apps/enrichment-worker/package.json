@@ -1,0 +1,26 @@
+{
+  "name": "@mortemlabs/enrichment-worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Worker that enriches Solana transaction trace events from Helius webhooks.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mortemlabs/db": "workspace:*",
+    "@mortemlabs/shared": "workspace:*",
+    "@upstash/redis": "^1.35.5",
+    "fastify": "^5.2.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "vitest": "^1.6.1"
+  }
+}
