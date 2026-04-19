@@ -18,6 +18,7 @@ type DashboardAuthState = {
 }
 
 const DashboardAuthContext = createContext<DashboardAuthState>({ privyEnabled: false })
+const trpcUrl = process.env.NEXT_PUBLIC_MORTEM_SERVER_URL ?? "http://localhost:3001/api/trpc"
 
 export function useDashboardAuth() {
   return useContext(DashboardAuthContext)
@@ -63,7 +64,7 @@ function TRPCProvider({
             return token === null ? {} : { Authorization: `Bearer ${token}` }
           },
           transformer: superjson,
-          url: "/api/trpc",
+          url: trpcUrl,
         }),
       ],
     }),
