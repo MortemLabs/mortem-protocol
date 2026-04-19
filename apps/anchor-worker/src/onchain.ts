@@ -57,14 +57,16 @@ const readCommitter = (): Keypair | undefined => {
 }
 
 const nextBatchIndex = async (agentId: string): Promise<bigint> => {
-  const anchoredCount = await prisma.trace.count({
+  const anchoredBatches = await prisma.trace.findMany({
+    distinct: ["anchorSignature"],
+    select: { anchorSignature: true },
     where: {
       agentId,
       anchorSignature: { not: null },
     },
   })
 
-  return BigInt(anchoredCount)
+  return BigInt(anchoredBatches.length)
 }
 
 const isFundingRequired = (error: unknown): boolean =>
