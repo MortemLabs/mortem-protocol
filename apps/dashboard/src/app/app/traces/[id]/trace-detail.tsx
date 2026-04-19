@@ -76,6 +76,7 @@ type TraceDetailView = {
   id: string
   inputSummary: string
   merkleProof: string | null
+  merkleRoot: string | null
   outputSummary: string | null
   shareToken: string | null
   solanaTxCount: number
@@ -205,6 +206,7 @@ const previewTrace: TraceDetailView = {
   id: "01JTRACEPREVIEWA",
   inputSummary: "Swap route evaluation for SOL to USDC.",
   merkleProof: "[]",
+  merkleRoot: "9f3f89dd6a0b8f0e8d2d4f8d5bdc2b7c3b5b5bd4a9dbb9c2b5e15ad9e46c47e5",
   outputSummary: "Swap sent on devnet and anchored as a singleton proof.",
   shareToken: "01JSHAREPREVIEW",
   solanaTxCount: 1,
@@ -854,6 +856,7 @@ function toTraceDetailView(trace: TraceOutput): TraceDetailView {
     id: trace.id,
     inputSummary: trace.inputSummary,
     merkleProof: trace.merkleProof,
+    merkleRoot: trace.merkleRoot,
     outputSummary: trace.outputSummary,
     shareToken: trace.shareToken,
     solanaTxCount: trace.solanaTxCount,
@@ -936,18 +939,29 @@ async function verifyTraceAnchor(trace: TraceDetailView): Promise<VerificationSt
     return { kind: "invalid", message: "Stored Merkle proof is not valid JSON." }
   }
 
+  if (trace.merkleRoot === null) {
+    return { kind: "unavailable", message: "Anchor batch root has not been indexed yet." }
+  }
+
+  const verified = await verifyMerkleProofInBrowser(trace.traceHash, proof, trace.merkleRoot)
+
+  if (verified) {
+    return {
+      computedRoot: trace.merkleRoot,
+      kind: "verified",
+      message: "Merkle proof verified against the AnchorBatch root.",
+    }
+  }
+
   if (proof.length === 0) {
-    const verified = await verifyMerkleProofInBrowser(trace.traceHash, [], trace.traceHash)
-    return verified
-      ? { kind: "verified", message: "Singleton Merkle proof verified against the trace hash." }
-      : { kind: "invalid", message: "Singleton proof did not match the trace hash." }
+    return { kind: "invalid", message: "Singleton proof did not match the AnchorBatch root." }
   }
 
   const computedRoot = await computeRootFromProof(trace.traceHash, proof)
   return {
     computedRoot,
-    kind: "computed",
-    message: "Merkle proof recomputed locally. Compare this root with the AnchorBatch root.",
+    kind: "invalid",
+    message: "Merkle proof recomputed locally but did not match the AnchorBatch root.",
   }
 }
 

@@ -1,6 +1,7 @@
 // Trace procedures expose paginated trace browsing, detail reads, public share token controls, and
 // deletion for agents the authenticated Privy user can access.
 import prisma, { type Prisma } from "@mortemlabs/db"
+import { getMerkleRoot } from "@mortemlabs/shared"
 import { ulid } from "ulid"
 import { z } from "zod"
 import { createTRPCRouter, protectedProcedure } from "../trpc"
@@ -33,6 +34,31 @@ const traceAccessWhere = (traceId: string, userId: string) => ({
     OR: [{ ownerId: userId }, { agentOwners: { some: { userId } } }],
   },
 })
+
+const getTraceBatchRoot = async ({
+  agentId,
+  anchorSignature,
+}: {
+  agentId: string
+  anchorSignature: string | null
+}): Promise<string | null> => {
+  if (anchorSignature === null) {
+    return null
+  }
+
+  const traces = await prisma.trace.findMany({
+    orderBy: { startedAt: "asc" },
+    select: { traceHash: true },
+    where: {
+      agentId,
+      anchorSignature,
+      traceHash: { not: null },
+    },
+  })
+  const hashes = traces.flatMap((trace) => (trace.traceHash === null ? [] : [trace.traceHash]))
+
+  return hashes.length === 0 ? null : getMerkleRoot(hashes)
+}
 
 export const tracesRouter = createTRPCRouter({
   list: protectedProcedure.input(TraceListInputSchema).query(async ({ ctx, input }) => {
@@ -71,15 +97,27 @@ export const tracesRouter = createTRPCRouter({
     }
   }),
 
-  get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) =>
-    prisma.trace.findFirst({
+  get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const trace = await prisma.trace.findFirst({
       include: {
         analysis: true,
         events: { orderBy: { sequence: "asc" } },
       },
       where: traceAccessWhere(input.id, ctx.userId),
-    }),
-  ),
+    })
+
+    if (trace === null) {
+      return null
+    }
+
+    return {
+      ...trace,
+      merkleRoot: await getTraceBatchRoot({
+        agentId: trace.agentId,
+        anchorSignature: trace.anchorSignature,
+      }),
+    }
+  }),
 
   share: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     const existing = await prisma.trace.findFirst({
