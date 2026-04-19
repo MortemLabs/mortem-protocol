@@ -2,7 +2,7 @@
 // procedures require a verified Privy DID attached by createTRPCContext.
 import { TRPCError, initTRPC } from "@trpc/server"
 import superjson from "superjson"
-import type { TRPCContext } from "./context.js"
+import type { TRPCContext } from "./context"
 
 const t = initTRPC.context<TRPCContext>().create({
   transformer: superjson,

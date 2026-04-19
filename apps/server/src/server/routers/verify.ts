@@ -3,7 +3,7 @@
 import prisma from "@mortemlabs/db"
 import { verifyMerkleProof } from "@mortemlabs/shared"
 import { z } from "zod"
-import { createTRPCRouter, publicProcedure } from "../trpc.js"
+import { createTRPCRouter, publicProcedure } from "../trpc"
 
 const parseProof = (value: string | null): string[] => {
   if (value === null) {

@@ -15,9 +15,9 @@ import {
   deriveAgentRegistryPda,
   deriveAnchorBatchPda,
   deriveUserRegistryPda,
-} from "../../lib/pda.js"
-import { generateSolanaPayQr } from "../../lib/qr.js"
-import { createTRPCRouter, protectedProcedure } from "../trpc.js"
+} from "../../lib/pda"
+import { generateSolanaPayQr } from "../../lib/qr"
+import { createTRPCRouter, protectedProcedure } from "../trpc"
 
 const PRIORITY_FEE_MICROLAMPORTS = 50_000
 const DEFAULT_MINIMUM_PDA_LAMPORTS = 5_000_000

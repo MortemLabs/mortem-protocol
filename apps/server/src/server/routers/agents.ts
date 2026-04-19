@@ -5,7 +5,7 @@ import prisma from "@mortemlabs/db"
 import { sha256 } from "@mortemlabs/shared"
 import { ulid } from "ulid"
 import { z } from "zod"
-import { createTRPCRouter, protectedProcedure } from "../trpc.js"
+import { createTRPCRouter, protectedProcedure } from "../trpc"
 
 const EnvironmentSchema = z.enum(["devnet", "mainnet"])
 

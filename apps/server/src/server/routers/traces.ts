@@ -3,7 +3,7 @@
 import prisma, { type Prisma } from "@mortemlabs/db"
 import { ulid } from "ulid"
 import { z } from "zod"
-import { createTRPCRouter, protectedProcedure } from "../trpc.js"
+import { createTRPCRouter, protectedProcedure } from "../trpc"
 
 const TraceListInputSchema = z.object({
   agentId: z.string(),

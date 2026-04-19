@@ -1,11 +1,11 @@
 // The root tRPC router composes feature routers and exports the AppRouter type for clients.
 // Additional routers are added here as the server surface grows.
-import { agentsRouter } from "./routers/agents.js"
-import { analysisRouter } from "./routers/analysis.js"
-import { onchainRouter } from "./routers/onchain.js"
-import { tracesRouter } from "./routers/traces.js"
-import { verifyRouter } from "./routers/verify.js"
-import { createTRPCRouter } from "./trpc.js"
+import { agentsRouter } from "./routers/agents"
+import { analysisRouter } from "./routers/analysis"
+import { onchainRouter } from "./routers/onchain"
+import { tracesRouter } from "./routers/traces"
+import { verifyRouter } from "./routers/verify"
+import { createTRPCRouter } from "./trpc"
 
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,

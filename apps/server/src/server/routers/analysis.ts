@@ -2,8 +2,8 @@
 // traces. Actual LLM work is performed by the analysis worker.
 import prisma from "@mortemlabs/db"
 import { z } from "zod"
-import { getRedis } from "../redis.js"
-import { createTRPCRouter, protectedProcedure } from "../trpc.js"
+import { getRedis } from "../redis"
+import { createTRPCRouter, protectedProcedure } from "../trpc"
 
 const traceAccessWhere = (traceId: string, userId: string) => ({
   id: traceId,

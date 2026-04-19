@@ -4,8 +4,8 @@ import prisma, { type Prisma } from "@mortemlabs/db"
 import { FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
 import { ulid } from "ulid"
 import { z } from "zod"
-import { getLLMClient } from "../lib/llm.js"
-import { getRedis } from "./redis.js"
+import { getLLMClient } from "../lib/llm"
+import { getRedis } from "./redis"
 
 const POLL_INTERVAL_MS = 5_000
 
