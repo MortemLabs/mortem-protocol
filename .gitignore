@@ -1,0 +1,14 @@
+node_modules/
+.turbo/
+.next/
+dist/
+coverage/
+target/
+
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+anchor-wallet.json

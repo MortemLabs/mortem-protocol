@@ -1,0 +1,27 @@
+{
+  "name": "mortem-protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Production-grade observability and debugging platform for TypeScript AI agents running on Solana.",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "turbo run clean",
+    "dev": "turbo run dev",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "turbo": "2.5.0",
+    "typescript": "5.4.5"
+  }
+}
