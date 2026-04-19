@@ -142,10 +142,6 @@ pub mod mortem {
             MortemError::FundingRequired
         );
 
-        **user_registry_info.try_borrow_mut_lamports()? = user_registry_balance - batch_rent;
-        **anchor_batch_info.try_borrow_mut_lamports()? =
-            anchor_batch_info.lamports().saturating_add(batch_rent);
-
         let batch_bump_seed = [batch_bump];
         let batch_signer_seeds: &[&[u8]] = &[
             BATCH_SEED,
@@ -173,6 +169,10 @@ pub mod mortem {
 
         let timestamp = Clock::get()?.unix_timestamp;
         let user_registry_key = ctx.accounts.user_registry.key();
+        **user_registry_info.try_borrow_mut_lamports()? = user_registry_balance - batch_rent;
+        **anchor_batch_info.try_borrow_mut_lamports()? =
+            anchor_batch_info.lamports().saturating_add(batch_rent);
+
         let anchor_batch = AnchorBatch {
             user_registry: user_registry_key,
             agent: agent_key,
