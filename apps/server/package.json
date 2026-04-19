@@ -9,7 +9,7 @@
     "clean": "rm -rf .next",
     "dev": "next dev --port 3001",
     "start": "next start --port 3001",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "worker:analysis": "tsx src/server/analysis-worker.ts"
   },

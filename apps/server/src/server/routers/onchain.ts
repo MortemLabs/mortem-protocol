@@ -11,11 +11,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js"
 import { z } from "zod"
-import {
-  deriveAgentRegistryPda,
-  deriveAnchorBatchPda,
-  deriveUserRegistryPda,
-} from "../../lib/pda"
+import { deriveAgentRegistryPda, deriveAnchorBatchPda, deriveUserRegistryPda } from "../../lib/pda"
 import { generateSolanaPayQr } from "../../lib/qr"
 import { createTRPCRouter, protectedProcedure } from "../trpc"
 
