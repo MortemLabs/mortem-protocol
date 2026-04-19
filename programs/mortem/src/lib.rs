@@ -5,7 +5,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("WAE2TdwNCtdfw8VveeKgRmzK5Tsf9nquAxXPwZBD3Ce");
 
 pub const AGENT_REGISTRY_SEED: &[u8] = b"agent";
 pub const BATCH_SEED: &[u8] = b"batch";
