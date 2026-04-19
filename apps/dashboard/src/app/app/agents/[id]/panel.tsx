@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
 import { AlertCircle, ArrowLeft, Radio, ReceiptText, Settings } from "lucide-react"
 import Link from "next/link"
+import type { RefObject } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 export function AgentDetail({ agentId }: Readonly<{ agentId: string }>) {
   const { privyEnabled } = useDashboardAuth()
@@ -145,30 +147,448 @@ function AgentDetailFrame({
             </div>
           </div>
 
-          <aside className="border border-border bg-card p-5 text-card-foreground shadow-sm">
-            <div className="flex items-center gap-2">
-              <Radio className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="font-medium tracking-normal">Live stream</h2>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Connect the SDK and keep this page open to follow new events as they arrive.
-            </p>
-            <div className="mt-5 space-y-3">
-              {["waiting for session", "SSE ready", "auto-follow off"].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center justify-between border border-border px-3 py-2 text-sm"
-                >
-                  <span>{item}</span>
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground" aria-hidden="true" />
-                </div>
-              ))}
-            </div>
-          </aside>
+          {mode === "private" ? (
+            <AuthenticatedLiveStreamPanel agentId={agent.id} />
+          ) : (
+            <PreviewLiveStreamPanel />
+          )}
         </section>
       </div>
     </main>
   )
+}
+
+type LiveTraceRow = {
+  eventCount: number
+  events: Array<{ id: string; sequence: number; status: string; type: string }>
+  id: string
+  receivedAt: Date
+  status: string
+  summary: string
+  totalTokens: number
+}
+
+const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:3002"
+
+function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>) {
+  const { authenticated, getAccessToken } = usePrivy()
+  const [connected, setConnected] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState("")
+  const [focusedIndex, setFocusedIndex] = useState(0)
+  const [follow, setFollow] = useState(true)
+  const [rows, setRows] = useState<LiveTraceRow[]>([])
+  const listEndRef = useRef<HTMLDivElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!authenticated) {
+      return
+    }
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    const connect = async () => {
+      try {
+        const token = await getAccessToken()
+        const response = await fetch(`${ingestUrl}/v1/agents/${agentId}/live`, {
+          headers: token === null ? {} : { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        })
+
+        if (!response.ok || response.body === null) {
+          setError("Live stream is unavailable.")
+          return
+        }
+
+        setConnected(true)
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (!cancelled) {
+          const { done, value } = await reader.read()
+          if (done) {
+            break
+          }
+
+          buffer += decoder.decode(value, { stream: true })
+          const blocks = buffer.split("\n\n")
+          buffer = blocks.pop() ?? ""
+
+          for (const block of blocks) {
+            const item = parseSseBlock(block)
+            if (item === null) {
+              continue
+            }
+
+            if (item.event === "warning") {
+              setError(readWarning(item.data))
+              continue
+            }
+
+            const row = parseLiveTraceRow(item.data)
+            if (row !== null) {
+              setRows((current) => mergeLiveRow(current, row))
+            }
+          }
+        }
+      } catch (streamError) {
+        if (!controller.signal.aborted) {
+          setError(errorMessage(streamError))
+        }
+      } finally {
+        if (!cancelled) {
+          setConnected(false)
+        }
+      }
+    }
+
+    void connect()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [agentId, authenticated, getAccessToken])
+
+  const visibleRows = useMemo(() => {
+    if (filter.trim().length === 0) {
+      return rows
+    }
+
+    const query = filter.toLowerCase()
+    return rows.filter(
+      (row) =>
+        row.id.toLowerCase().includes(query) ||
+        row.status.toLowerCase().includes(query) ||
+        row.summary.toLowerCase().includes(query),
+    )
+  }, [filter, rows])
+  const visibleRowCount = visibleRows.length
+
+  useEffect(() => {
+    if (follow && visibleRowCount >= 0) {
+      listEndRef.current?.scrollIntoView({ block: "nearest" })
+    }
+  }, [follow, visibleRowCount])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      const editing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+
+      if (event.key === "/" && !editing) {
+        event.preventDefault()
+        searchRef.current?.focus()
+        return
+      }
+
+      if (event.key === " " && !editing) {
+        event.preventDefault()
+        setFollow((value) => !value)
+        return
+      }
+
+      if (event.key === "j" && !editing) {
+        event.preventDefault()
+        setFocusedIndex((index) => Math.min(index + 1, Math.max(0, visibleRows.length - 1)))
+        return
+      }
+
+      if (event.key === "k" && !editing) {
+        event.preventDefault()
+        setFocusedIndex((index) => Math.max(0, index - 1))
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [visibleRows.length])
+
+  return (
+    <LiveStreamFrame
+      connected={connected}
+      error={error}
+      filter={filter}
+      focusedIndex={focusedIndex}
+      follow={follow}
+      listEndRef={listEndRef}
+      rows={visibleRows}
+      searchRef={searchRef}
+      setFilter={setFilter}
+      setFollow={setFollow}
+      setFocusedIndex={setFocusedIndex}
+    />
+  )
+}
+
+function PreviewLiveStreamPanel() {
+  const [filter, setFilter] = useState("")
+  const [focusedIndex, setFocusedIndex] = useState(0)
+  const [follow, setFollow] = useState(true)
+  const listEndRef = useRef<HTMLDivElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  const rows = [
+    {
+      eventCount: 4,
+      events: [
+        { id: "01JEVENTLLM", sequence: 1, status: "ok", type: "llm_call" },
+        { id: "01JEVENTTX", sequence: 2, status: "ok", type: "solana_tx" },
+      ],
+      id: "01JTRACEPREVIEWA",
+      receivedAt: new Date("2026-04-19T10:15:01.000Z"),
+      status: "completed",
+      summary: "Swap route evaluation for SOL to USDC.",
+      totalTokens: 4320,
+    },
+  ] satisfies LiveTraceRow[]
+
+  return (
+    <LiveStreamFrame
+      connected
+      error={null}
+      filter={filter}
+      focusedIndex={focusedIndex}
+      follow={follow}
+      listEndRef={listEndRef}
+      rows={rows}
+      searchRef={searchRef}
+      setFilter={setFilter}
+      setFollow={setFollow}
+      setFocusedIndex={setFocusedIndex}
+    />
+  )
+}
+
+function LiveStreamFrame({
+  connected,
+  error,
+  filter,
+  focusedIndex,
+  follow,
+  listEndRef,
+  rows,
+  searchRef,
+  setFilter,
+  setFocusedIndex,
+  setFollow,
+}: Readonly<{
+  connected: boolean
+  error: string | null
+  filter: string
+  focusedIndex: number
+  follow: boolean
+  listEndRef: RefObject<HTMLDivElement | null>
+  rows: LiveTraceRow[]
+  searchRef: RefObject<HTMLInputElement | null>
+  setFilter: (value: string) => void
+  setFocusedIndex: (index: number) => void
+  setFollow: (value: boolean) => void
+}>) {
+  return (
+    <aside className="border border-border bg-card p-5 text-card-foreground shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Radio className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2 className="font-medium tracking-normal">Live stream</h2>
+        </div>
+        <Badge variant={connected ? "success" : "warning"}>
+          {connected ? "SSE ready" : "connecting"}
+        </Badge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        Follow new trace batches from ingest as they arrive.
+      </p>
+
+      <div className="mt-4 flex gap-2">
+        <input
+          ref={searchRef}
+          type="search"
+          value={filter}
+          onChange={(event) => setFilter(event.currentTarget.value)}
+          placeholder="Filter live traces"
+          className="min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+        <Button
+          type="button"
+          variant={follow ? "secondary" : "outline"}
+          onClick={() => setFollow(!follow)}
+        >
+          {follow ? "Follow" : "Paused"}
+        </Button>
+      </div>
+
+      <div className="mt-3 rounded-md border border-border bg-background p-3 text-xs text-muted-foreground">
+        j/k move · space toggles follow · / focuses filter
+      </div>
+      {error === null ? null : (
+        <div className="mt-3 rounded-md border border-amber-600/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1">
+        {rows.length === 0 ? (
+          <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+            Waiting for session.
+          </div>
+        ) : (
+          rows.map((row, index) => (
+            <Link
+              key={row.id}
+              href={`/app/traces/${row.id}`}
+              className="block rounded-md border border-border p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[focused=true]:border-primary"
+              data-focused={index === focusedIndex}
+              onFocus={() => setFocusedIndex(index)}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                <span className="font-mono text-xs text-muted-foreground">{row.id}</span>
+              </div>
+              <p className="mt-2 text-sm leading-6">{row.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span>{row.eventCount} events</span>
+                <span>{row.totalTokens} tokens</span>
+                <span>{row.receivedAt.toLocaleTimeString()}</span>
+              </div>
+            </Link>
+          ))
+        )}
+        <div ref={listEndRef} />
+      </div>
+    </aside>
+  )
+}
+
+function parseSseBlock(block: string): { data: string; event: string } | null {
+  const data: string[] = []
+  let event = "message"
+
+  for (const line of block.split("\n")) {
+    if (line.startsWith(":")) {
+      continue
+    }
+
+    if (line.startsWith("event:")) {
+      event = line.slice("event:".length).trim()
+      continue
+    }
+
+    if (line.startsWith("data:")) {
+      data.push(line.slice("data:".length).trim())
+    }
+  }
+
+  return data.length === 0 ? null : { data: data.join("\n"), event }
+}
+
+function parseLiveTraceRow(data: string): LiveTraceRow | null {
+  try {
+    const parsed = JSON.parse(data) as unknown
+    if (!isRecord(parsed) || !isRecord(parsed.trace)) {
+      return null
+    }
+
+    const trace = parsed.trace
+    const id = readString(trace, "id")
+    const status = readString(trace, "status")
+    const summary = readString(trace, "inputSummary")
+
+    if (id === null || status === null || summary === null) {
+      return null
+    }
+
+    return {
+      eventCount: readNumber(trace, "eventCount") ?? 0,
+      events: parseLiveEvents(parsed.events),
+      id,
+      receivedAt: new Date(),
+      status,
+      summary,
+      totalTokens: readNumber(trace, "totalTokens") ?? 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+function parseLiveEvents(value: unknown): LiveTraceRow["events"] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.flatMap((item) => {
+    if (!isRecord(item)) {
+      return []
+    }
+
+    const id = readString(item, "id")
+    const type = readString(item, "type")
+    const status = readString(item, "status") ?? "ok"
+    const sequence = readNumber(item, "sequence")
+
+    if (id === null || type === null || sequence === null) {
+      return []
+    }
+
+    return [{ id, sequence, status, type }]
+  })
+}
+
+function mergeLiveRow(current: LiveTraceRow[], row: LiveTraceRow): LiveTraceRow[] {
+  return [...current.filter((item) => item.id !== row.id), row].slice(-100)
+}
+
+function readWarning(data: string): string {
+  try {
+    const parsed = JSON.parse(data) as unknown
+    return isRecord(parsed) && typeof parsed.message === "string"
+      ? parsed.message
+      : "Live stream interrupted."
+  } catch {
+    return "Live stream interrupted."
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Live stream disconnected."
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key]
+  return typeof value === "string" ? value : null
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key]
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function statusVariant(
+  status: string,
+): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
+  if (status === "completed") {
+    return "success"
+  }
+
+  if (status === "errored" || status === "timeout") {
+    return "error"
+  }
+
+  if (status === "running") {
+    return "warning"
+  }
+
+  return "secondary"
 }
 
 function AgentDetailSkeleton() {
