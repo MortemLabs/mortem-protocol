@@ -3,6 +3,7 @@
 import { gunzipSync } from "node:zlib"
 import Fastify, { type FastifyInstance } from "fastify"
 import { getIngestEnv } from "./env.js"
+import { registerHealthRoutes } from "./routes/health.js"
 
 export const createIngestServer = (): FastifyInstance => {
   const env = getIngestEnv()
@@ -21,6 +22,8 @@ export const createIngestServer = (): FastifyInstance => {
       done(error instanceof Error ? error : new Error("Invalid JSON body"))
     }
   })
+
+  registerHealthRoutes(server)
 
   return server
 }
