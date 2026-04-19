@@ -49,7 +49,7 @@ const displayNameBytes = (displayName: string): Buffer => {
 }
 
 const displayNameHash = (displayName: string): Buffer =>
-  createHash("sha256").update(displayName).digest()
+  createHash("sha256").update(displayNameBytes(displayName)).digest()
 
 const txBase64 = async (tx: Transaction, feePayer: PublicKey): Promise<string> => {
   const { blockhash } = await connection().getLatestBlockhash("confirmed")
@@ -171,6 +171,7 @@ export const onchainRouter = createTRPCRouter({
 
       const agent = await prisma.agent.findUniqueOrThrow({ where: { id: input.agentId } })
       const owner = new PublicKey(input.wallet)
+      const agentWallet = new PublicKey(agent.agentWallet ?? input.wallet)
       const [userPda] = await deriveUserRegistryPda(input.wallet, programId())
       const [agentPda] = await deriveAgentRegistryPda(
         userPda.toBase58(),
@@ -181,7 +182,7 @@ export const onchainRouter = createTRPCRouter({
         data: Buffer.concat([
           instructionDiscriminator("register_agent"),
           displayNameBytes(agent.displayName),
-          owner.toBuffer(),
+          agentWallet.toBuffer(),
         ]),
         keys: [
           { isSigner: true, isWritable: true, pubkey: owner },
@@ -204,7 +205,8 @@ export const onchainRouter = createTRPCRouter({
       z.object({ agentId: z.string().optional(), txSignature: z.string(), wallet: z.string() }),
     )
     .mutation(async ({ ctx, input }) => {
-      const status = await connection().getSignatureStatus(input.txSignature, {
+      const rpc = connection()
+      const status = await rpc.getSignatureStatus(input.txSignature, {
         searchTransactionHistory: true,
       })
 
@@ -216,8 +218,11 @@ export const onchainRouter = createTRPCRouter({
       }
 
       const [userPda] = await deriveUserRegistryPda(input.wallet, programId())
-      await prisma.user.update({
-        data: { pdaFunded: true, userPda: userPda.toBase58() },
+      const pdaBalance = await rpc.getBalance(userPda, "confirmed")
+      const pdaFunded = pdaBalance >= minimumPdaLamports()
+      await prisma.user.upsert({
+        create: { id: ctx.userId, pdaFunded, userPda: userPda.toBase58() },
+        update: { pdaFunded, userPda: userPda.toBase58() },
         where: { id: ctx.userId },
       })
 
