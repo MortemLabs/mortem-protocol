@@ -11,6 +11,9 @@ importers:
       '@biomejs/biome':
         specifier: 1.9.4
         version: 1.9.4
+      '@types/node':
+        specifier: ^22.15.2
+        version: 22.19.17
       turbo:
         specifier: 2.5.0
         version: 2.5.0
