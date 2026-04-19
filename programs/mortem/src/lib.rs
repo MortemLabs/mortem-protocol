@@ -8,8 +8,10 @@ use anchor_lang::solana_program::hash::hash;
 declare_id!("11111111111111111111111111111111");
 
 pub const AGENT_REGISTRY_SEED: &[u8] = b"agent";
+pub const BATCH_SEED: &[u8] = b"batch";
 pub const USER_REGISTRY_SEED: &[u8] = b"user";
 pub const FREE_PLAN: u8 = 0;
+pub const MINIMUM_RESERVE: u64 = 5_000_000;
 
 #[program]
 pub mod mortem {
@@ -63,6 +65,51 @@ pub mod mortem {
 
         Ok(())
     }
+
+    pub fn commit_batch(
+        ctx: Context<CommitBatch>,
+        merkle_root: [u8; 32],
+        trace_count: u32,
+    ) -> Result<()> {
+        let batch_rent = Rent::get()?.minimum_balance(8 + AnchorBatch::LEN);
+        let user_registry_balance = ctx.accounts.user_registry.to_account_info().lamports();
+
+        require!(
+            user_registry_balance >= batch_rent.saturating_add(MINIMUM_RESERVE),
+            MortemError::FundingRequired
+        );
+
+        let timestamp = Clock::get()?.unix_timestamp;
+        let batch_index = ctx.accounts.agent_registry.batch_count;
+        let user_registry_key = ctx.accounts.user_registry.key();
+        let agent_key = ctx.accounts.agent_registry.key();
+        let anchor_batch = &mut ctx.accounts.anchor_batch;
+
+        anchor_batch.user_registry = user_registry_key;
+        anchor_batch.agent = agent_key;
+        anchor_batch.batch_index = batch_index;
+        anchor_batch.merkle_root = merkle_root;
+        anchor_batch.trace_count = trace_count;
+        anchor_batch.committed_at = timestamp;
+        anchor_batch.committer = ctx.accounts.committer.key();
+        anchor_batch.bump = ctx.bumps.anchor_batch;
+
+        ctx.accounts.agent_registry.batch_count =
+            ctx.accounts.agent_registry.batch_count.saturating_add(1);
+        ctx.accounts.user_registry.batch_count =
+            ctx.accounts.user_registry.batch_count.saturating_add(1);
+
+        emit!(CommitBatchEvent {
+            user_registry: user_registry_key,
+            agent: agent_key,
+            batch_index,
+            merkle_root,
+            trace_count,
+            committed_at: timestamp,
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -107,6 +154,42 @@ pub struct RegisterAgent<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct CommitBatch<'info> {
+    #[account(mut)]
+    pub committer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [USER_REGISTRY_SEED, user_registry.owner.as_ref()],
+        bump = user_registry.bump
+    )]
+    pub user_registry: Account<'info, UserRegistry>,
+    #[account(
+        mut,
+        seeds = [
+            AGENT_REGISTRY_SEED,
+            user_registry.key().as_ref(),
+            hash(&agent_registry.display_name).as_ref()
+        ],
+        bump = agent_registry.bump,
+        has_one = user_registry
+    )]
+    pub agent_registry: Account<'info, AgentRegistry>,
+    #[account(
+        init,
+        payer = user_registry,
+        space = 8 + AnchorBatch::LEN,
+        seeds = [
+            BATCH_SEED,
+            agent_registry.key().as_ref(),
+            &agent_registry.batch_count.to_le_bytes()
+        ],
+        bump
+    )]
+    pub anchor_batch: Account<'info, AnchorBatch>,
+    pub system_program: Program<'info, System>,
+}
+
 #[account]
 pub struct UserRegistry {
     pub owner: Pubkey,
@@ -137,6 +220,22 @@ impl AgentRegistry {
     pub const LEN: usize = 32 + 32 + 32 + 32 + 8 + 8 + 1;
 }
 
+#[account]
+pub struct AnchorBatch {
+    pub user_registry: Pubkey,
+    pub agent: Pubkey,
+    pub batch_index: u64,
+    pub merkle_root: [u8; 32],
+    pub trace_count: u32,
+    pub committed_at: i64,
+    pub committer: Pubkey,
+    pub bump: u8,
+}
+
+impl AnchorBatch {
+    pub const LEN: usize = 32 + 32 + 8 + 32 + 4 + 8 + 32 + 1;
+}
+
 #[event]
 pub struct RegisterUserEvent {
     pub owner: Pubkey,
@@ -150,4 +249,24 @@ pub struct RegisterAgentEvent {
     pub agent_pda: Pubkey,
     pub user_pda: Pubkey,
     pub timestamp: i64,
+}
+
+#[event]
+pub struct CommitBatchEvent {
+    pub user_registry: Pubkey,
+    pub agent: Pubkey,
+    pub batch_index: u64,
+    pub merkle_root: [u8; 32],
+    pub trace_count: u32,
+    pub committed_at: i64,
+}
+
+#[error_code]
+pub enum MortemError {
+    #[msg("UserRegistry PDA has insufficient balance")]
+    FundingRequired,
+    #[msg("Wrong signer for privileged instruction")]
+    Unauthorized,
+    #[msg("Unknown plan value")]
+    InvalidPlan,
 }
