@@ -2,6 +2,7 @@
 // wrapper methods are intentionally structural so provider packages remain dynamic and optional.
 import { MortemBuffer } from "./buffer.js"
 import { wrapAnthropicClient } from "./instrument/anthropic.js"
+import { wrapOllamaClient } from "./instrument/ollama.js"
 import { wrapOpenAIClient } from "./instrument/openai.js"
 import { Session } from "./session.js"
 import type {
@@ -100,7 +101,7 @@ export class Mortem {
   }
 
   wrapOllama<T>(client: T): T {
-    return client
+    return wrapOllamaClient(client)
   }
 
   wrapTools<T>(tools: T): T {
