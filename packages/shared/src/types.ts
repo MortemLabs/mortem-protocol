@@ -124,25 +124,29 @@ export interface LLMCallPayload {
   provider: LLMProvider | "openai" | "vercel-ai" | "unknown"
   model: string
   input: {
-    system?: string
+    system?: string | undefined
     messages: Array<{
       role: "system" | "user" | "assistant" | "tool"
       content: string | JsonValue
-      name?: string
-      toolCallId?: string
+      name?: string | undefined
+      toolCallId?: string | undefined
     }>
-    parameters?: Record<string, JsonValue>
+    parameters?: Record<string, JsonValue> | undefined
   }
-  output?: {
-    content: string | JsonValue
-    finishReason?: string
-    toolCalls?: Array<{
-      id: string
-      name: string
-      arguments: JsonValue
-    }>
-  }
-  usage?: TokenUsage
+  output?:
+    | {
+        content: string | JsonValue
+        finishReason?: string | undefined
+        toolCalls?:
+          | Array<{
+              id: string
+              name: string
+              arguments: JsonValue
+            }>
+          | undefined
+      }
+    | undefined
+  usage?: TokenUsage | undefined
   costUsd: number
   streamed: boolean
 }
@@ -150,23 +154,23 @@ export interface LLMCallPayload {
 export interface ToolCallPayload {
   toolName: string
   input: JsonValue
-  output?: JsonValue
-  metadata?: Record<string, JsonValue>
+  output?: JsonValue | undefined
+  metadata?: Record<string, JsonValue> | undefined
 }
 
 export interface SolanaTxPayload {
   cluster: "devnet" | "mainnet" | "localnet"
-  rpcUrl?: string
-  signature?: string
+  rpcUrl?: string | undefined
+  signature?: string | undefined
   instructionNames: string[]
   accountKeys: string[]
   programIds: string[]
-  slot?: number
-  lamports?: string
-  feeLamports?: string
-  confirmationStatus?: "processed" | "confirmed" | "finalized"
-  error?: JsonValue
-  enrichment?: JsonValue
+  slot?: number | undefined
+  lamports?: string | undefined
+  feeLamports?: string | undefined
+  confirmationStatus?: "processed" | "confirmed" | "finalized" | undefined
+  error?: JsonValue | undefined
+  enrichment?: JsonValue | undefined
 }
 
 export interface X402PaymentPayload {
@@ -175,25 +179,25 @@ export interface X402PaymentPayload {
   resource: string
   amount: string
   asset: string
-  payer?: string
-  payee?: string
-  transaction?: string
+  payer?: string | undefined
+  payee?: string | undefined
+  transaction?: string | undefined
   settled: boolean
-  metadata?: Record<string, JsonValue>
+  metadata?: Record<string, JsonValue> | undefined
 }
 
 export interface McpCallPayload {
   serverName: string
   toolName: string
   request: JsonValue
-  response?: JsonValue
-  metadata?: Record<string, JsonValue>
+  response?: JsonValue | undefined
+  metadata?: Record<string, JsonValue> | undefined
 }
 
 export interface CustomPayload {
   name: string
   data: JsonValue
-  metadata?: Record<string, JsonValue>
+  metadata?: Record<string, JsonValue> | undefined
 }
 
 export type TraceEventPayload =
