@@ -4,6 +4,7 @@ import { agentsRouter } from "./routers/agents.js"
 import { analysisRouter } from "./routers/analysis.js"
 import { onchainRouter } from "./routers/onchain.js"
 import { tracesRouter } from "./routers/traces.js"
+import { verifyRouter } from "./routers/verify.js"
 import { createTRPCRouter } from "./trpc.js"
 
 export const appRouter = createTRPCRouter({
@@ -11,6 +12,7 @@ export const appRouter = createTRPCRouter({
   analysis: analysisRouter,
   onchain: onchainRouter,
   traces: tracesRouter,
+  verify: verifyRouter,
 })
 
 export type AppRouter = typeof appRouter
