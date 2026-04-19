@@ -34,6 +34,7 @@ model Agent {
   registryPda   String?
   userPda       String?
   createdAt     DateTime     @default(now())
+  traces        Trace[]
   agentOwners   AgentOwner[]
 }
 
@@ -45,4 +46,69 @@ model AgentOwner {
   agent   Agent  @relation(fields: [agentId], references: [id])
 
   @@id([userId, agentId])
+}
+
+model Trace {
+  id              String         @id
+  agentId         String
+  agent           Agent          @relation(fields: [agentId], references: [id])
+  status          String
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMs      Int?
+  inputSummary    String
+  outputSummary   String?
+  errorMessage    String?
+  eventCount      Int            @default(0)
+  totalTokens     Int            @default(0)
+  totalCostUsd    Decimal        @default(0) @db.Decimal(10, 6)
+  totalLamports   BigInt         @default(0)
+  solanaTxCount   Int            @default(0)
+  toolsCalled     String[]
+  anchorSignature String?
+  anchorSlot      BigInt?
+  merkleProof     String?
+  traceHash       String?
+  shareToken      String?        @unique
+  tags            String[]
+  events          TraceEvent[]
+  analysis        TraceAnalysis?
+
+  @@index([agentId, startedAt(sort: Desc)])
+  @@index([shareToken])
+}
+
+model TraceEvent {
+  id               String   @id
+  traceId          String
+  trace            Trace    @relation(fields: [traceId], references: [id], onDelete: Cascade)
+  parentEventId    String?
+  sequence         Int
+  type             String
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationMs       Int?
+  payload          Json
+  payloadEncrypted Boolean  @default(false)
+  status           String   @default("ok")
+  errorMessage     String?
+
+  @@index([traceId, sequence])
+  @@index([type])
+}
+
+model TraceAnalysis {
+  id              String   @id
+  traceId         String   @unique
+  trace           Trace    @relation(fields: [traceId], references: [id])
+  failureType     String
+  confidence      Float
+  summary         String
+  whatAgentSaw    String
+  whatAgentMissed String
+  counterfactuals Json
+  suggestedFix    String
+  analyzedAt      DateTime
+  modelUsed       String
+  llmProvider     String
 }
