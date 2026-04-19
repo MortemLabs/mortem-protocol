@@ -6,25 +6,40 @@ import { PrivyProvider, usePrivy } from "@privy-io/react-auth"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { httpBatchLink } from "@trpc/client"
 import { createTRPCReact } from "@trpc/react-query"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, createContext, useContext, useState } from "react"
 import superjson from "superjson"
 import type { AppRouter } from "../../../server/src/server/root"
 
 export const trpc = createTRPCReact<AppRouter>()
 
 type AccessTokenGetter = () => Promise<string | null>
+type DashboardAuthState = {
+  privyEnabled: boolean
+}
+
+const DashboardAuthContext = createContext<DashboardAuthState>({ privyEnabled: false })
+
+export function useDashboardAuth() {
+  return useContext(DashboardAuthContext)
+}
 
 export function DashboardProviders({ children }: Readonly<{ children: ReactNode }>) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? ""
 
   if (appId.trim().length === 0) {
-    return <TRPCProvider getAccessToken={async () => null}>{children}</TRPCProvider>
+    return (
+      <DashboardAuthContext.Provider value={{ privyEnabled: false }}>
+        <TRPCProvider getAccessToken={async () => null}>{children}</TRPCProvider>
+      </DashboardAuthContext.Provider>
+    )
   }
 
   return (
-    <PrivyProvider appId={appId} config={{ loginMethods: ["email", "wallet"] }}>
-      <PrivyTRPCBridge>{children}</PrivyTRPCBridge>
-    </PrivyProvider>
+    <DashboardAuthContext.Provider value={{ privyEnabled: true }}>
+      <PrivyProvider appId={appId} config={{ loginMethods: ["email", "wallet"] }}>
+        <PrivyTRPCBridge>{children}</PrivyTRPCBridge>
+      </PrivyProvider>
+    </DashboardAuthContext.Provider>
   )
 }
 
