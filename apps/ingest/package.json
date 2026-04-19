@@ -1,0 +1,28 @@
+{
+  "name": "@mortemlabs/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify ingestion service for Mortem trace events.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mortemlabs/db": "workspace:*",
+    "@mortemlabs/shared": "workspace:*",
+    "@privy-io/server-auth": "^1.28.0",
+    "@upstash/redis": "^1.35.5",
+    "fastify": "^5.2.2",
+    "ulid": "^2.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "vitest": "^1.6.1"
+  }
+}
