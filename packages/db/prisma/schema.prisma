@@ -8,3 +8,41 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id            String       @id
+  email         String?
+  primaryWallet String?
+  userPda       String?
+  pdaFunded     Boolean      @default(false)
+  plan          String       @default("free")
+  createdAt     DateTime     @default(now())
+  agents        Agent[]
+  agentOwners   AgentOwner[]
+}
+
+model Agent {
+  id            String       @id
+  ownerId       String
+  owner         User         @relation(fields: [ownerId], references: [id])
+  agentWallet   String?
+  displayName   String
+  apiKeyHash    String       @unique
+  environment   String
+  privateMode   Boolean      @default(false)
+  retentionDays Int          @default(30)
+  registryPda   String?
+  userPda       String?
+  createdAt     DateTime     @default(now())
+  agentOwners   AgentOwner[]
+}
+
+model AgentOwner {
+  userId  String
+  agentId String
+  role    String
+  user    User   @relation(fields: [userId], references: [id])
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  @@id([userId, agentId])
+}
