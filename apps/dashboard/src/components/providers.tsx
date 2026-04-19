@@ -19,6 +19,18 @@ type DashboardAuthState = {
 
 const DashboardAuthContext = createContext<DashboardAuthState>({ privyEnabled: false })
 const trpcUrl = process.env.NEXT_PUBLIC_MORTEM_SERVER_URL ?? "http://localhost:3001/api/trpc"
+const privyConfig = {
+  appearance: {
+    landingHeader: "Sign in to Mortem",
+    loginMessage: "Use email or a Solana wallet to inspect agent traces.",
+    walletChainType: "solana-only",
+  },
+  legal: {
+    privacyPolicyUrl: null,
+    termsAndConditionsUrl: null,
+  },
+  loginMethods: ["email", "wallet"],
+} satisfies NonNullable<Parameters<typeof PrivyProvider>[0]["config"]>
 
 export function useDashboardAuth() {
   return useContext(DashboardAuthContext)
@@ -37,7 +49,7 @@ export function DashboardProviders({ children }: Readonly<{ children: ReactNode 
 
   return (
     <DashboardAuthContext.Provider value={{ privyEnabled: true }}>
-      <PrivyProvider appId={appId} config={{ loginMethods: ["email", "wallet"] }}>
+      <PrivyProvider appId={appId} config={privyConfig}>
         <PrivyTRPCBridge>{children}</PrivyTRPCBridge>
       </PrivyProvider>
     </DashboardAuthContext.Provider>
