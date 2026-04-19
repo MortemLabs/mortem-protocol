@@ -10,7 +10,8 @@
     "dev": "next dev --port 3001",
     "start": "next start --port 3001",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "worker:analysis": "tsx src/server/analysis-worker.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

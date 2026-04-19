@@ -3,7 +3,9 @@
 import { Redis } from "@upstash/redis"
 
 export interface RedisLike {
+  lrange<T>(key: string, start: number, stop: number): Promise<T[]>
   lpush(key: string, ...values: string[]): Promise<unknown>
+  lrem(key: string, count: number, value: string): Promise<unknown>
   publish(channel: string, message: string): Promise<unknown>
 }
 
@@ -15,6 +17,30 @@ class MemoryRedis implements RedisLike {
     list.unshift(...values)
     this.lists.set(key, list)
     return list.length
+  }
+
+  async lrange<T>(key: string, start: number, stop: number): Promise<T[]> {
+    const list = this.lists.get(key) ?? []
+    const normalizedStop = stop < 0 ? list.length : stop + 1
+    return list.slice(start, normalizedStop) as T[]
+  }
+
+  async lrem(key: string, count: number, value: string): Promise<unknown> {
+    const list = this.lists.get(key) ?? []
+    const next: string[] = []
+    let removed = 0
+
+    for (const item of list) {
+      if ((count === 0 || removed < Math.abs(count)) && item === value) {
+        removed += 1
+        continue
+      }
+
+      next.push(item)
+    }
+
+    this.lists.set(key, next)
+    return removed
   }
 
   async publish(_channel: string, _message: string): Promise<unknown> {
