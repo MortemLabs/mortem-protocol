@@ -1,0 +1,38 @@
+{
+  "name": "@mortemlabs/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Next.js API and analysis server for Mortem.",
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "clean": "rm -rf .next",
+    "dev": "next dev --port 3001",
+    "start": "next start --port 3001",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@mortemlabs/db": "workspace:*",
+    "@mortemlabs/shared": "workspace:*",
+    "@privy-io/server-auth": "^1.28.0",
+    "@solana/web3.js": "^1.95.8",
+    "@trpc/server": "11.0.0",
+    "@upstash/redis": "^1.35.5",
+    "next": "15.3.2",
+    "ollama": "^0.5.17",
+    "qrcode": "^1.5.4",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "superjson": "^2.2.2",
+    "ulid": "^2.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "19.0.12",
+    "@types/react-dom": "19.0.4",
+    "vitest": "^1.6.1"
+  }
+}
