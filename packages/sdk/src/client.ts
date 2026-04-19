@@ -4,6 +4,7 @@ import { MortemBuffer } from "./buffer.js"
 import { wrapAnthropicClient } from "./instrument/anthropic.js"
 import { wrapOllamaClient } from "./instrument/ollama.js"
 import { wrapOpenAIClient } from "./instrument/openai.js"
+import { wrapVercelAILanguageModel, wrapVercelAITools } from "./instrument/vercel-ai.js"
 import { Session } from "./session.js"
 import type {
   Connection,
@@ -105,11 +106,11 @@ export class Mortem {
   }
 
   wrapTools<T>(tools: T): T {
-    return tools
+    return wrapVercelAITools(tools)
   }
 
   wrapLanguageModel<T extends LanguageModel>(model: T): T {
-    return model
+    return wrapVercelAILanguageModel(model)
   }
 
   langchainHandler(): MortemCallbackHandler {
