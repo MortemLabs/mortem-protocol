@@ -118,28 +118,72 @@ pub mod mortem {
         merkle_root: [u8; 32],
         trace_count: u32,
     ) -> Result<()> {
+        let batch_index = ctx.accounts.agent_registry.batch_count;
+        let batch_index_bytes = batch_index.to_le_bytes();
+        let agent_key = ctx.accounts.agent_registry.key();
+        let (batch_pda, batch_bump) = Pubkey::find_program_address(
+            &[BATCH_SEED, agent_key.as_ref(), batch_index_bytes.as_ref()],
+            ctx.program_id,
+        );
+
+        require_keys_eq!(
+            batch_pda,
+            ctx.accounts.anchor_batch.key(),
+            MortemError::Unauthorized
+        );
+
         let batch_rent = Rent::get()?.minimum_balance(8 + AnchorBatch::LEN);
-        let user_registry_balance = ctx.accounts.user_registry.to_account_info().lamports();
+        let user_registry_info = ctx.accounts.user_registry.to_account_info();
+        let anchor_batch_info = ctx.accounts.anchor_batch.to_account_info();
+        let user_registry_balance = user_registry_info.lamports();
 
         require!(
             user_registry_balance >= batch_rent.saturating_add(MINIMUM_RESERVE),
             MortemError::FundingRequired
         );
 
-        let timestamp = Clock::get()?.unix_timestamp;
-        let batch_index = ctx.accounts.agent_registry.batch_count;
-        let user_registry_key = ctx.accounts.user_registry.key();
-        let agent_key = ctx.accounts.agent_registry.key();
-        let anchor_batch = &mut ctx.accounts.anchor_batch;
+        **user_registry_info.try_borrow_mut_lamports()? = user_registry_balance - batch_rent;
+        **anchor_batch_info.try_borrow_mut_lamports()? =
+            anchor_batch_info.lamports().saturating_add(batch_rent);
 
-        anchor_batch.user_registry = user_registry_key;
-        anchor_batch.agent = agent_key;
-        anchor_batch.batch_index = batch_index;
-        anchor_batch.merkle_root = merkle_root;
-        anchor_batch.trace_count = trace_count;
-        anchor_batch.committed_at = timestamp;
-        anchor_batch.committer = ctx.accounts.committer.key();
-        anchor_batch.bump = ctx.bumps.anchor_batch;
+        let batch_bump_seed = [batch_bump];
+        let batch_signer_seeds: &[&[u8]] = &[
+            BATCH_SEED,
+            agent_key.as_ref(),
+            batch_index_bytes.as_ref(),
+            &batch_bump_seed,
+        ];
+
+        invoke_signed(
+            &system_instruction::allocate(&batch_pda, (8 + AnchorBatch::LEN) as u64),
+            &[
+                anchor_batch_info.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[batch_signer_seeds],
+        )?;
+        invoke_signed(
+            &system_instruction::assign(&batch_pda, ctx.program_id),
+            &[
+                anchor_batch_info.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[batch_signer_seeds],
+        )?;
+
+        let timestamp = Clock::get()?.unix_timestamp;
+        let user_registry_key = ctx.accounts.user_registry.key();
+        let anchor_batch = AnchorBatch {
+            user_registry: user_registry_key,
+            agent: agent_key,
+            batch_index,
+            merkle_root,
+            trace_count,
+            committed_at: timestamp,
+            committer: ctx.accounts.committer.key(),
+            bump: batch_bump,
+        };
+        anchor_batch.try_serialize(&mut &mut ctx.accounts.anchor_batch.data.borrow_mut()[..])?;
 
         ctx.accounts.agent_registry.batch_count =
             ctx.accounts.agent_registry.batch_count.saturating_add(1);
@@ -236,18 +280,9 @@ pub struct CommitBatch<'info> {
         has_one = user_registry
     )]
     pub agent_registry: Account<'info, AgentRegistry>,
-    #[account(
-        init,
-        payer = user_registry,
-        space = 8 + AnchorBatch::LEN,
-        seeds = [
-            BATCH_SEED,
-            agent_registry.key().as_ref(),
-            &agent_registry.batch_count.to_le_bytes()
-        ],
-        bump
-    )]
-    pub anchor_batch: Account<'info, AnchorBatch>,
+    /// CHECK: The instruction verifies this PDA, funds it from UserRegistry, and writes AnchorBatch data.
+    #[account(mut)]
+    pub anchor_batch: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
