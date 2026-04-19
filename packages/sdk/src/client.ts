@@ -5,6 +5,7 @@ import { wrapAnthropicClient } from "./instrument/anthropic.js"
 import { createLangChainHandler } from "./instrument/langchain.js"
 import { wrapOllamaClient } from "./instrument/ollama.js"
 import { wrapOpenAIClient } from "./instrument/openai.js"
+import { wrapSolanaConnection } from "./instrument/solana.js"
 import { wrapVercelAILanguageModel, wrapVercelAITools } from "./instrument/vercel-ai.js"
 import { Session } from "./session.js"
 import type {
@@ -119,7 +120,7 @@ export class Mortem {
   }
 
   wrapConnection<T extends Connection>(conn: T): T {
-    return conn
+    return wrapSolanaConnection(conn)
   }
 
   async flush(): Promise<void> {
