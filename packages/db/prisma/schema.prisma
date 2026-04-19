@@ -1,0 +1,10 @@
+// The Prisma schema is the durable database contract for Mortem services.
+// All application data access goes through this schema and the generated client.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
