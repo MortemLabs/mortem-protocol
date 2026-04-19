@@ -168,7 +168,7 @@ type LiveTraceRow = {
   totalTokens: number
 }
 
-const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:3002"
+const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
 
 function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>) {
   const { authenticated, getAccessToken } = usePrivy()
