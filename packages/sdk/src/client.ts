@@ -2,6 +2,7 @@
 // wrapper methods are intentionally structural so provider packages remain dynamic and optional.
 import { MortemBuffer } from "./buffer.js"
 import { wrapAnthropicClient } from "./instrument/anthropic.js"
+import { createLangChainHandler } from "./instrument/langchain.js"
 import { wrapOllamaClient } from "./instrument/ollama.js"
 import { wrapOpenAIClient } from "./instrument/openai.js"
 import { wrapVercelAILanguageModel, wrapVercelAITools } from "./instrument/vercel-ai.js"
@@ -114,7 +115,7 @@ export class Mortem {
   }
 
   langchainHandler(): MortemCallbackHandler {
-    return { name: "mortem" }
+    return createLangChainHandler()
   }
 
   wrapConnection<T extends Connection>(conn: T): T {
