@@ -92,6 +92,22 @@ export default async function SharePage({
                 value={"traceHash" in data.verification ? data.verification.traceHash : "missing"}
               />
               <ReadonlyRow
+                label="Merkle root"
+                value={
+                  "merkleRoot" in data.verification
+                    ? (data.verification.merkleRoot ?? "missing")
+                    : "missing"
+                }
+              />
+              <ReadonlyRow
+                label="On-chain root"
+                value={
+                  "onChainRootMatched" in data.verification && data.verification.onChainRootMatched
+                    ? "matched"
+                    : "not matched"
+                }
+              />
+              <ReadonlyRow
                 label="Anchor slot"
                 value={
                   "anchorSlot" in data.verification
