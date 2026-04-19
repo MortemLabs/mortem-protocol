@@ -16,4 +16,6 @@ export const getIngestEnv = () => ({
   maxBodyBytes: readInteger("INGEST_MAX_BODY_BYTES", 10_485_760),
   port: readInteger("PORT", 4001),
   rateLimitPerMinute: readInteger("INGEST_RATELIMIT_PER_MIN", 10_000),
+  redisToken: process.env.REDIS_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN,
+  redisUrl: process.env.REDIS_URL ?? process.env.UPSTASH_REDIS_REST_URL,
 })

@@ -3,6 +3,7 @@
 import { gunzipSync } from "node:zlib"
 import Fastify, { type FastifyInstance } from "fastify"
 import { getIngestEnv } from "./env.js"
+import { registerBatchRoutes } from "./routes/batch.js"
 import { registerHealthRoutes } from "./routes/health.js"
 
 export const createIngestServer = (): FastifyInstance => {
@@ -23,6 +24,7 @@ export const createIngestServer = (): FastifyInstance => {
     }
   })
 
+  registerBatchRoutes(server)
   registerHealthRoutes(server)
 
   return server
