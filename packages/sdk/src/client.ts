@@ -1,6 +1,7 @@
 // Mortem is the public SDK client that owns buffering and creates trace sessions. Instrumentation
 // wrapper methods are intentionally structural so provider packages remain dynamic and optional.
 import { MortemBuffer } from "./buffer.js"
+import { wrapAnthropicClient } from "./instrument/anthropic.js"
 import { wrapOpenAIClient } from "./instrument/openai.js"
 import { Session } from "./session.js"
 import type {
@@ -95,7 +96,7 @@ export class Mortem {
   }
 
   wrapAnthropic<T>(client: T): T {
-    return client
+    return wrapAnthropicClient(client)
   }
 
   wrapOllama<T>(client: T): T {
