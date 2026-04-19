@@ -17,7 +17,8 @@
     "@mortemlabs/db": "workspace:*",
     "@mortemlabs/shared": "workspace:*",
     "@solana/web3.js": "^1.95.8",
-    "@upstash/redis": "^1.35.5"
+    "@upstash/redis": "^1.35.5",
+    "bs58": "^6.0.0"
   },
   "devDependencies": {
     "tsx": "^4.19.4",
