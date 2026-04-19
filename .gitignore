@@ -10,5 +10,6 @@ target/
 !.env.example
 
 *.log
+*.tsbuildinfo
 .DS_Store
 anchor-wallet.json
