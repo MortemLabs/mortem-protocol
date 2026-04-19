@@ -3,9 +3,9 @@
 #![allow(unexpected_cfgs)]
 
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+use anchor_lang::solana_program::{hash::hash, program::invoke_signed, system_instruction};
 
-declare_id!("WAE2TdwNCtdfw8VveeKgRmzK5Tsf9nquAxXPwZBD3Ce");
+declare_id!("9HooSdYAu1uDNwuoDhjcQr8KH67TwSXe4XJEviuKofMn");
 
 pub const AGENT_REGISTRY_SEED: &[u8] = b"agent";
 pub const BATCH_SEED: &[u8] = b"batch";
@@ -48,21 +48,65 @@ pub mod mortem {
     ) -> Result<()> {
         let timestamp = Clock::get()?.unix_timestamp;
         let user_registry = &mut ctx.accounts.user_registry;
-        let agent_registry = &mut ctx.accounts.agent_registry;
+        let user_registry_key = user_registry.key();
+        let display_name_hash = hash(&display_name).to_bytes();
+        let (agent_pda, agent_bump) = Pubkey::find_program_address(
+            &[
+                AGENT_REGISTRY_SEED,
+                user_registry_key.as_ref(),
+                display_name_hash.as_ref(),
+            ],
+            ctx.program_id,
+        );
 
-        agent_registry.user_registry = user_registry.key();
-        agent_registry.owner = ctx.accounts.owner.key();
-        agent_registry.agent_wallet = agent_wallet;
-        agent_registry.display_name = display_name;
-        agent_registry.created_at = timestamp;
-        agent_registry.batch_count = 0;
-        agent_registry.bump = ctx.bumps.agent_registry;
+        require_keys_eq!(
+            agent_pda,
+            ctx.accounts.agent_registry.key(),
+            MortemError::Unauthorized
+        );
+
+        let rent_lamports = Rent::get()?.minimum_balance(8 + AgentRegistry::LEN);
+        let create_agent = system_instruction::create_account(
+            &ctx.accounts.owner.key(),
+            &agent_pda,
+            rent_lamports,
+            (8 + AgentRegistry::LEN) as u64,
+            ctx.program_id,
+        );
+        let bump = [agent_bump];
+        let signer_seeds: &[&[u8]] = &[
+            AGENT_REGISTRY_SEED,
+            user_registry_key.as_ref(),
+            display_name_hash.as_ref(),
+            &bump,
+        ];
+
+        invoke_signed(
+            &create_agent,
+            &[
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.agent_registry.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
+
+        let agent_registry = AgentRegistry {
+            user_registry: user_registry_key,
+            owner: ctx.accounts.owner.key(),
+            agent_wallet,
+            display_name,
+            created_at: timestamp,
+            batch_count: 0,
+            bump: agent_bump,
+        };
+        agent_registry.try_serialize(&mut &mut ctx.accounts.agent_registry.data.borrow_mut()[..])?;
         user_registry.agent_count = user_registry.agent_count.saturating_add(1);
 
         emit!(RegisterAgentEvent {
             owner: ctx.accounts.owner.key(),
-            agent_pda: agent_registry.key(),
-            user_pda: user_registry.key(),
+            agent_pda,
+            user_pda: user_registry_key,
             timestamp,
         });
 
@@ -160,7 +204,7 @@ pub struct RegisterUser<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(display_name: [u8; 32])]
+#[instruction(display_name: [u8; 32], agent_wallet: Pubkey)]
 pub struct RegisterAgent<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -171,18 +215,9 @@ pub struct RegisterAgent<'info> {
         has_one = owner
     )]
     pub user_registry: Account<'info, UserRegistry>,
-    #[account(
-        init,
-        payer = owner,
-        space = 8 + AgentRegistry::LEN,
-        seeds = [
-            AGENT_REGISTRY_SEED,
-            user_registry.key().as_ref(),
-            hash(&display_name).as_ref()
-        ],
-        bump
-    )]
-    pub agent_registry: Account<'info, AgentRegistry>,
+    /// CHECK: The instruction creates and verifies this PDA before writing AgentRegistry data.
+    #[account(mut)]
+    pub agent_registry: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -198,12 +233,6 @@ pub struct CommitBatch<'info> {
     pub user_registry: Account<'info, UserRegistry>,
     #[account(
         mut,
-        seeds = [
-            AGENT_REGISTRY_SEED,
-            user_registry.key().as_ref(),
-            hash(&agent_registry.display_name).as_ref()
-        ],
-        bump = agent_registry.bump,
         has_one = user_registry
     )]
     pub agent_registry: Account<'info, AgentRegistry>,
@@ -245,12 +274,6 @@ pub struct CloseAgent<'info> {
     #[account(
         mut,
         close = owner_wallet,
-        seeds = [
-            AGENT_REGISTRY_SEED,
-            user_registry.key().as_ref(),
-            hash(&agent_registry.display_name).as_ref()
-        ],
-        bump = agent_registry.bump,
         has_one = user_registry
     )]
     pub agent_registry: Account<'info, AgentRegistry>,
