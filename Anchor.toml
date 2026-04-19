@@ -8,6 +8,9 @@ skip-lint = false
 [programs.devnet]
 mortem = "9HooSdYAu1uDNwuoDhjcQr8KH67TwSXe4XJEviuKofMn"
 
+[programs.localnet]
+mortem = "9HooSdYAu1uDNwuoDhjcQr8KH67TwSXe4XJEviuKofMn"
+
 [registry]
 url = "https://api.apr.dev"
 
