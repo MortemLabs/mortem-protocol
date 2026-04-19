@@ -5,6 +5,7 @@ export { getActiveEventId, getActiveSession, runWithEvent, runWithSession } from
 export { decryptPayload, encryptPayload } from "./encrypt.js"
 export { EventBuilder } from "./event-builder.js"
 export { createLangChainHandler, createLangChainHandlerAsync } from "./instrument/langchain.js"
+export { fetchPythPrices } from "./market/pyth.js"
 export { estimateLLMCostUsd, getModelPricing } from "./pricing.js"
 export { Session } from "./session.js"
 export type {
