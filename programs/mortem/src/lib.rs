@@ -122,6 +122,15 @@ pub mod mortem {
 
         Ok(())
     }
+
+    pub fn close_agent(ctx: Context<CloseAgent>) -> Result<()> {
+        require_admin(&ctx.accounts.admin)?;
+
+        ctx.accounts.user_registry.agent_count =
+            ctx.accounts.user_registry.agent_count.saturating_sub(1);
+
+        Ok(())
+    }
 }
 
 fn require_admin(admin: &Signer<'_>) -> Result<()> {
@@ -216,6 +225,31 @@ pub struct UpgradePlan<'info> {
         bump = user_registry.bump
     )]
     pub user_registry: Account<'info, UserRegistry>,
+}
+
+#[derive(Accounts)]
+pub struct CloseAgent<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [USER_REGISTRY_SEED, user_registry.owner.as_ref()],
+        bump = user_registry.bump
+    )]
+    pub user_registry: Account<'info, UserRegistry>,
+    #[account(
+        mut,
+        close = owner_wallet,
+        seeds = [
+            AGENT_REGISTRY_SEED,
+            user_registry.key().as_ref(),
+            hash(&agent_registry.display_name).as_ref()
+        ],
+        bump = agent_registry.bump,
+        has_one = user_registry
+    )]
+    pub agent_registry: Account<'info, AgentRegistry>,
+    #[account(mut, address = user_registry.owner)]
+    pub owner_wallet: SystemAccount<'info>,
 }
 
 #[account]
