@@ -74,6 +74,7 @@ const previewHistory = [
   {
     batchIndex: 0,
     batchPda: "BatchPda111111111111111111111111111111111",
+    committedAt: 1_776_569_700,
     explorerLink:
       "https://explorer.solana.com/tx/5yPreviewAnchorSignature111111111111111111111111111111111?cluster=devnet",
     merkleRoot: "9f3f89dd6a0b8f0e8d2d4f8d5bdc2b7c3b5b5bd4a9dbb9c2b5e15ad9e46c47e5",

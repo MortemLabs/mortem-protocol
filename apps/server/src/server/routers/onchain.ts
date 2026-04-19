@@ -2,6 +2,7 @@
 // The server never signs user registration transactions; backend signing is reserved for commit_batch.
 import { createHash } from "node:crypto"
 import prisma from "@mortemlabs/db"
+import { getMerkleRoot } from "@mortemlabs/shared"
 import {
   ComputeBudgetProgram,
   Connection,
@@ -11,7 +12,8 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js"
 import { z } from "zod"
-import { deriveAgentRegistryPda, deriveAnchorBatchPda, deriveUserRegistryPda } from "../../lib/pda"
+import { fetchAnchorBatchesByAgent } from "../../lib/anchor-batch"
+import { deriveAgentRegistryPda, deriveUserRegistryPda } from "../../lib/pda"
 import { generateSolanaPayQr } from "../../lib/qr"
 import { createTRPCRouter, protectedProcedure } from "../trpc"
 
@@ -69,6 +71,57 @@ const assertAccess = async (agentId: string, userId: string): Promise<boolean> =
   })
 
   return agent !== null
+}
+
+const buildDbBatchLookup = async (
+  agentId: string,
+): Promise<Map<string, { explorerLink: string | null; slot: string | null }>> => {
+  const traces = await prisma.trace.findMany({
+    orderBy: { startedAt: "asc" },
+    select: {
+      anchorSignature: true,
+      anchorSlot: true,
+      traceHash: true,
+    },
+    where: {
+      agentId,
+      anchorSignature: { not: null },
+      traceHash: { not: null },
+    },
+  })
+  const grouped = new Map<
+    string,
+    Array<{ anchorSlot: bigint | null; hash: string; signature: string }>
+  >()
+
+  for (const trace of traces) {
+    if (trace.anchorSignature === null || trace.traceHash === null) {
+      continue
+    }
+
+    const existing = grouped.get(trace.anchorSignature) ?? []
+    existing.push({
+      anchorSlot: trace.anchorSlot,
+      hash: trace.traceHash,
+      signature: trace.anchorSignature,
+    })
+    grouped.set(trace.anchorSignature, existing)
+  }
+
+  const lookup = new Map<string, { explorerLink: string | null; slot: string | null }>()
+
+  for (const items of grouped.values()) {
+    const root = getMerkleRoot(items.map((item) => item.hash))
+    const signature = items[0]?.signature ?? null
+
+    lookup.set(root, {
+      explorerLink:
+        signature === null ? null : `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+      slot: items[0]?.anchorSlot?.toString() ?? null,
+    })
+  }
+
+  return lookup
 }
 
 export const onchainRouter = createTRPCRouter({
@@ -199,43 +252,38 @@ export const onchainRouter = createTRPCRouter({
         return []
       }
 
-      const traces = await prisma.trace.findMany({
-        distinct: ["anchorSignature"],
-        orderBy: { startedAt: "desc" },
+      const agent = await prisma.agent.findUnique({
         select: {
-          anchorSignature: true,
-          anchorSlot: true,
-          traceHash: true,
+          registryPda: true,
         },
-        where: {
-          agentId: input.agentId,
-          anchorSignature: { not: null },
-        },
+        where: { id: input.agentId },
       })
 
-      return Promise.all(
-        traces.map(async (trace, index) => {
-          const batchIndex = BigInt(index)
-          const agent = await prisma.agent.findUnique({ where: { id: input.agentId } })
-          const batchPda =
-            agent?.registryPda === null || agent?.registryPda === undefined
-              ? null
-              : (
-                  await deriveAnchorBatchPda(agent.registryPda, batchIndex, programId())
-                )[0].toBase58()
+      if (agent?.registryPda === null || agent?.registryPda === undefined) {
+        return []
+      }
 
-          return {
-            batchIndex: index,
-            batchPda,
-            explorerLink:
-              trace.anchorSignature === null
-                ? null
-                : `https://explorer.solana.com/tx/${trace.anchorSignature}?cluster=devnet`,
-            merkleRoot: trace.traceHash,
-            slot: trace.anchorSlot?.toString() ?? null,
-            traceCount: 1,
-          }
+      const [batches, dbLookup] = await Promise.all([
+        fetchAnchorBatchesByAgent({
+          agentPda: agent.registryPda,
+          connection: connection(),
+          programId: programId(),
         }),
-      )
+        buildDbBatchLookup(input.agentId),
+      ])
+
+      return batches.map((batch) => {
+        const db = dbLookup.get(batch.merkleRoot)
+
+        return {
+          batchIndex: batch.batchIndex,
+          batchPda: batch.batchPda,
+          committedAt: batch.committedAt,
+          explorerLink: db?.explorerLink ?? null,
+          merkleRoot: batch.merkleRoot,
+          slot: db?.slot ?? null,
+          traceCount: batch.traceCount,
+        }
+      })
     }),
 })
