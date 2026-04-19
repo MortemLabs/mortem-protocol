@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
-import { Activity, AlertCircle, Database, Plus, RefreshCcw } from "lucide-react"
+import { Activity, AlertCircle, Database, Plus, RefreshCcw, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import type { AppRouter } from "../../../../server/src/server/root"
 
@@ -140,12 +140,20 @@ function AgentListFrame({
           <h2 className="mt-1 text-xl font-semibold tracking-normal">Agent registry</h2>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button asChild>
-          <Link href="/app/agents/new">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            New agent
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild variant="secondary">
+            <Link href="/app/onchain">
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              On-chain
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/app/agents/new">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              New agent
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="divide-y divide-border">
