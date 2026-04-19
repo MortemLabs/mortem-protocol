@@ -10,7 +10,10 @@ declare_id!("11111111111111111111111111111111");
 pub const AGENT_REGISTRY_SEED: &[u8] = b"agent";
 pub const BATCH_SEED: &[u8] = b"batch";
 pub const USER_REGISTRY_SEED: &[u8] = b"user";
+pub const ADMIN_AUTHORITY: Pubkey = pubkey!("9C6hybhQ6Aycep9jaUnP6uL9ZYvDjUp1aSkFWPUFJtpj");
 pub const FREE_PLAN: u8 = 0;
+pub const PRO_PLAN: u8 = 1;
+pub const TEAM_PLAN: u8 = 2;
 pub const MINIMUM_RESERVE: u64 = 5_000_000;
 
 #[program]
@@ -110,6 +113,20 @@ pub mod mortem {
 
         Ok(())
     }
+
+    pub fn upgrade_plan(ctx: Context<UpgradePlan>, new_plan: u8) -> Result<()> {
+        require_admin(&ctx.accounts.admin)?;
+        require!(new_plan <= TEAM_PLAN, MortemError::InvalidPlan);
+
+        ctx.accounts.user_registry.plan = new_plan;
+
+        Ok(())
+    }
+}
+
+fn require_admin(admin: &Signer<'_>) -> Result<()> {
+    require_keys_eq!(admin.key(), ADMIN_AUTHORITY, MortemError::Unauthorized);
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -188,6 +205,17 @@ pub struct CommitBatch<'info> {
     )]
     pub anchor_batch: Account<'info, AnchorBatch>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpgradePlan<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [USER_REGISTRY_SEED, user_registry.owner.as_ref()],
+        bump = user_registry.bump
+    )]
+    pub user_registry: Account<'info, UserRegistry>,
 }
 
 #[account]
