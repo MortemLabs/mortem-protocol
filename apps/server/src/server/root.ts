@@ -2,12 +2,14 @@
 // Additional routers are added here as the server surface grows.
 import { agentsRouter } from "./routers/agents.js"
 import { analysisRouter } from "./routers/analysis.js"
+import { onchainRouter } from "./routers/onchain.js"
 import { tracesRouter } from "./routers/traces.js"
 import { createTRPCRouter } from "./trpc.js"
 
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,
   analysis: analysisRouter,
+  onchain: onchainRouter,
   traces: tracesRouter,
 })
 
