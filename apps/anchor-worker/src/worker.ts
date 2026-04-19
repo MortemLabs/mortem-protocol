@@ -3,6 +3,7 @@
 import prisma from "@mortemlabs/db"
 import { getMerkleProof, getMerkleRoot } from "@mortemlabs/shared"
 import { getAnchorWorkerEnv } from "./env.js"
+import { commitPreparedBatch } from "./onchain.js"
 import { type RedisLike, getRedis } from "./redis.js"
 
 export interface PreparedAnchorBatch {
@@ -97,7 +98,13 @@ export const runAnchorWorkerOnce = async (
   redis: RedisLike = getRedis(),
 ): Promise<PreparedAnchorBatch[]> => {
   const pending = await redis.lrange<string>("anchor:pending", 0, -1)
-  return preparePendingBatches(pending)
+  const batches = await preparePendingBatches(pending)
+
+  for (const batch of batches) {
+    await commitPreparedBatch(batch, redis)
+  }
+
+  return batches
 }
 
 export const startAnchorWorker = (): ReturnType<typeof setInterval> => {
