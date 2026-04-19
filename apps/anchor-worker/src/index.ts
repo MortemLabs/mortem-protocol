@@ -1,3 +1,5 @@
-// The anchor worker entrypoint will run the Merkle batch commit loop. The implementation stays in
-// importable modules so tests can exercise batching without starting an endless worker.
-export {}
+// The anchor worker entrypoint starts the pending trace polling loop. The worker module stays
+// importable so tests can exercise batch preparation without starting an endless process.
+import { startAnchorWorker } from "./worker.js"
+
+startAnchorWorker()
