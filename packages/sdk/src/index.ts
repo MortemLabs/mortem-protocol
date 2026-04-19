@@ -2,6 +2,7 @@
 // core Mortem client, session primitives, context helpers, and structural wrapper types.
 export { Mortem } from "./client.js"
 export { getActiveEventId, getActiveSession, runWithEvent, runWithSession } from "./context.js"
+export { decryptPayload, encryptPayload } from "./encrypt.js"
 export { EventBuilder } from "./event-builder.js"
 export { createLangChainHandler, createLangChainHandlerAsync } from "./instrument/langchain.js"
 export { estimateLLMCostUsd, getModelPricing } from "./pricing.js"
