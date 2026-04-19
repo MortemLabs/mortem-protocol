@@ -31,6 +31,19 @@ importers:
         specifier: ^5.22.0
         version: 5.22.0
 
+  packages/sdk:
+    dependencies:
+      '@mortemlabs/shared':
+        specifier: workspace:*
+        version: link:../shared
+      ulid:
+        specifier: ^2.3.0
+        version: 2.4.0
+    devDependencies:
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@22.19.17)
+
   packages/shared:
     dependencies:
       zod:
@@ -679,6 +692,10 @@ packages:
   ufo@1.6.3:
     resolution: {integrity: sha512-yDJTmhydvl5lJzBmy/hyOAA0d+aqCBuwl818haVdYCRrWV84o7YyeVm4QlVHStqNrrJSTb6jKuFAVqAFsr+K3Q==}
 
+  ulid@2.4.0:
+    resolution: {integrity: sha512-fIRiVTJNcSRmXKPZtGzFQv9WRrZ3M9eoptl/teFJvjOzmpU+/K/JH6HZ8deBfb5vMEpicJcLn7JmvdknlMq7Zg==}
+    hasBin: true
+
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
@@ -1279,6 +1296,8 @@ snapshots:
   typescript@5.4.5: {}
 
   ufo@1.6.3: {}
+
+  ulid@2.4.0: {}
 
   undici-types@6.21.0: {}
 
