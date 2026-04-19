@@ -1,5 +1,514 @@
 # Mortem
 
-Mortem is a production-grade observability and debugging platform for TypeScript AI agents running on Solana.
+Mortem is an observability and debugging platform for TypeScript AI agents running on Solana.
 
-This repository is a pnpm workspace powered by Turborepo, Biome, and strict TypeScript.
+It captures agent traces, LLM calls, tool calls, Solana transactions, and custom events. It stores
+those traces in Postgres, streams them live to a dashboard, analyzes failures with an LLM, and can
+anchor trace batches on Solana with Merkle roots.
+
+The project is a pnpm monorepo powered by Turborepo, strict TypeScript, Prisma, Fastify, Next.js,
+Privy, Upstash Redis, and Anchor.
+
+## What Mortem Does
+
+Mortem helps answer a few practical questions when an AI agent fails:
+
+- What did the agent see?
+- What did the agent call?
+- Which Solana transactions did it send?
+- What market context or tool output was available at the time?
+- Was the failure avoidable?
+- Can this trace be verified against an on-chain Merkle commitment?
+
+The core flow is:
+
+```text
+TypeScript agent
+  -> @mortemlabs/sdk
+  -> ingest service
+  -> Postgres traces and events
+  -> dashboard, live stream, analysis worker
+  -> anchor worker
+  -> Solana Anchor program
+```
+
+## Repository Structure
+
+```text
+.
+├── apps
+│   ├── dashboard          Next.js dashboard and public share pages
+│   ├── server             Next.js tRPC API, analysis worker, PDA and QR helpers
+│   ├── ingest             Fastify trace ingestion and live SSE service
+│   ├── anchor-worker      Worker that commits Merkle trace batches on Solana
+│   └── enrichment-worker  Helius webhook worker for Solana transaction enrichment
+├── packages
+│   ├── shared             Shared types, Zod schemas, canonical JSON, hashing, Merkle utilities
+│   ├── db                 Prisma schema, migrations, and Prisma client singleton
+│   └── sdk                Public TypeScript SDK and instrumentation wrappers
+├── programs
+│   └── mortem             Anchor program for user, agent, and batch registry PDAs
+├── Anchor.toml            Anchor workspace config
+├── turbo.json             Turborepo task graph
+├── biome.json             Biome lint and format config
+└── pnpm-workspace.yaml    pnpm workspace package layout
+```
+
+## Architecture
+
+### SDK
+
+`@mortemlabs/sdk` is the library used by agent code. It is intentionally light: it has no hard
+dependency on OpenAI, Anthropic, Ollama, LangChain, Vercel AI SDK, or Solana SDK packages.
+
+It provides:
+
+- `Mortem` client
+- `Session` trace lifecycle
+- event builders for `llm_call`, `tool_call`, `solana_tx`, `x402_payment`, `mcp_call`, and `custom`
+- wrappers for OpenAI, Anthropic, Ollama, Vercel AI SDK tools/models, LangChain callbacks, and Solana connections
+- gzip buffering with retries
+- best-effort behavior so SDK failures do not crash the agent
+- optional AES-256-GCM payload encryption with `MORTEM_MASTER_KEY`
+
+### Ingest Service
+
+`apps/ingest` is a Fastify service. It accepts trace batches from the SDK.
+
+Main routes:
+
+```text
+GET  /healthz
+POST /v1/traces/batch
+POST /v1/traces/:id/complete
+GET  /v1/agents/:id/live
+```
+
+The batch route validates input with Zod, resolves API keys, rate limits by agent, writes traces and
+events through Prisma, pushes live updates to Redis, and queues completed traces for analysis and
+anchoring.
+
+### API Server
+
+`apps/server` is a Next.js app that exposes tRPC at:
+
+```text
+http://localhost:3001/api/trpc
+```
+
+Routers:
+
+- `agents`: list, get, create, rotate API key, delete
+- `traces`: list, get, share, unshare, delete
+- `analysis`: get and rerun trace analysis
+- `onchain`: PDA info, QR funding, unsigned registration transactions, anchor history
+- `verify`: public trace lookup by share token
+
+Privy is frontend-only for login. The browser sends a Privy JWT with tRPC calls, and the server only
+uses `verifyAuthToken` to verify that JWT.
+
+### Dashboard
+
+`apps/dashboard` is the user interface.
+
+Routes:
+
+```text
+/                         Landing page
+/login                    Privy login
+/app                      Agent list
+/app/agents/[id]          Agent detail and live stream
+/app/agents/[id]/traces   Trace list
+/app/agents/[id]/settings Agent settings and API keys
+/app/traces/[id]          Trace detail
+/app/onchain              PDA registration, funding, and anchor history
+/share/[token]            Public shared trace
+```
+
+The dashboard uses Privy for login, tRPC for application data, and SSE for live trace updates.
+
+### Database
+
+`packages/db` owns the Prisma schema and generated client. The schema models:
+
+- `User`
+- `Agent`
+- `AgentOwner`
+- `Trace`
+- `TraceEvent`
+- `TraceAnalysis`
+
+All application database access goes through Prisma.
+
+### Redis
+
+Upstash Redis is used for short-lived caches, queues, live events, and worker signals.
+
+Important keys:
+
+```text
+apikey:{hash}              Agent API key cache
+live:{agentId}             Last 1000 live trace batches
+pubsub:live:{agentId}      Live stream notifications
+anchor:pending             Trace IDs waiting for on-chain anchoring
+analysis:pending           Trace IDs waiting for LLM analysis
+analysis:ready:{traceId}   Analysis completion signal
+ratelimit:{agentId}:{min}  Ingest rate limit counter
+trace:{traceId}            Cached trace JSON
+```
+
+For local development, some services have in-memory Redis fallbacks when Upstash credentials are not
+present. Postgres is still required for real app flows.
+
+### LLM Analysis
+
+The analysis worker lives in `apps/server/src/server/analysis-worker.ts`.
+
+It polls `analysis:pending`, fetches trace context from Postgres, calls the configured LLM provider,
+writes `TraceAnalysis`, and publishes `analysis:ready:{traceId}`.
+
+Provider selection is controlled by `LLM_PROVIDER`:
+
+```text
+LLM_PROVIDER=ollama
+LLM_PROVIDER=anthropic
+```
+
+Ollama is the default for local development. Anthropic requires `ANTHROPIC_API_KEY`.
+
+### On-Chain Program
+
+`programs/mortem` is an Anchor program on Solana devnet.
+
+It stores:
+
+- `UserRegistry` PDA for each user wallet
+- `AgentRegistry` PDA nested under a user registry
+- `AnchorBatch` PDA for each committed Merkle batch
+
+The verification chain is:
+
+```text
+wallet
+  -> UserRegistry PDA
+  -> AgentRegistry PDA
+  -> AnchorBatch PDA
+  -> Merkle root
+  -> Merkle proof
+  -> trace hash
+```
+
+Users register and fund their PDA from the dashboard. The backend wallet only signs `commit_batch`.
+It does not sign user registration transactions.
+
+## Prerequisites
+
+Install these before running the full stack:
+
+- Node.js 22 or newer
+- pnpm 9 or newer through Corepack
+- Postgres 16, Supabase, or another compatible Postgres database
+- Upstash Redis REST credentials for production-like queues
+- Privy app credentials
+- Helius API key for devnet RPC and transaction enrichment
+- Ollama locally or an Anthropic API key for analysis
+- Rust, Solana CLI, and Anchor 0.30.1 for on-chain development
+
+## Environment Setup
+
+This repo includes safe example files:
+
+```text
+.env.example
+apps/dashboard/.env.example
+apps/server/.env.example
+apps/ingest/.env.example
+apps/anchor-worker/.env.example
+apps/enrichment-worker/.env.example
+packages/db/.env.example
+packages/sdk/.env.example
+packages/shared/.env.example
+```
+
+Use the root example as a full-stack checklist:
+
+```bash
+cp .env.example .env.local
+```
+
+For Next.js apps, copy the app-level examples too:
+
+```bash
+cp apps/dashboard/.env.example apps/dashboard/.env.local
+cp apps/server/.env.example apps/server/.env.local
+```
+
+For non-Next services, export variables in your shell or process manager before starting them:
+
+```bash
+set -a
+source .env.local
+set +a
+```
+
+Never commit `.env`, `.env.local`, private keys, API keys, webhook secrets, or wallet secret keys.
+
+## Install
+
+```bash
+corepack enable
+corepack pnpm install
+```
+
+## Database Setup
+
+Point `DATABASE_URL` at Postgres, then generate Prisma client code and apply migrations:
+
+```bash
+corepack pnpm --filter @mortemlabs/db db:generate
+corepack pnpm --filter @mortemlabs/db db:migrate
+```
+
+To validate the Prisma schema:
+
+```bash
+corepack pnpm --filter @mortemlabs/db db:validate
+```
+
+## Run Locally
+
+The most convenient path is to run the core services in separate terminals.
+
+Start the API server:
+
+```bash
+corepack pnpm --filter @mortemlabs/server dev
+```
+
+Start the dashboard:
+
+```bash
+corepack pnpm --filter @mortemlabs/dashboard dev
+```
+
+Start ingest:
+
+```bash
+corepack pnpm --filter @mortemlabs/ingest dev
+```
+
+Optional workers:
+
+```bash
+corepack pnpm --filter @mortemlabs/server worker:analysis
+corepack pnpm --filter @mortemlabs/anchor-worker dev
+corepack pnpm --filter @mortemlabs/enrichment-worker dev
+```
+
+Default local URLs:
+
+```text
+Dashboard:         http://localhost:3000
+tRPC server:       http://localhost:3001/api/trpc
+Ingest service:    http://localhost:4001
+Enrichment worker: http://localhost:4002
+```
+
+You can also start every package with Turbo:
+
+```bash
+corepack pnpm dev
+```
+
+That is useful once your shell has the shared environment loaded.
+
+## Using The Dashboard
+
+1. Open `http://localhost:3000`.
+2. Sign in with Privy.
+3. Create an agent from `/app`.
+4. Copy the API key returned at creation time. It is only shown once.
+5. Use that key in an instrumented TypeScript agent.
+6. Open the agent detail page to watch live traces.
+7. Open a trace detail page to inspect events, analysis, sharing, and verification state.
+8. Use `/app/onchain` to register and fund PDAs for Solana anchoring.
+
+## Using The SDK
+
+Install the SDK package in an agent project, or import it from this workspace while developing.
+
+Basic manual instrumentation:
+
+```ts
+import { Mortem } from "@mortemlabs/sdk"
+
+const mortem = new Mortem({
+  apiKey: process.env.MORTEM_AGENT_API_KEY ?? "",
+  agentId: process.env.MORTEM_AGENT_ID,
+  environment: "devnet",
+  ingestUrl: process.env.MORTEM_INGEST_URL ?? "http://localhost:4001",
+})
+
+const session = await mortem.startSession({
+  inputSummary: "Answer a user question and optionally send a Solana transaction",
+  tags: ["local-dev"],
+})
+
+try {
+  const planning = session.beginEvent("custom", {
+    step: "planning",
+  })
+
+  planning.complete({
+    payload: {
+      step: "planning",
+      result: "ready",
+    },
+  })
+
+  await session.complete("Agent completed successfully")
+} catch (error) {
+  await session.fail(error)
+} finally {
+  await mortem.close()
+}
+```
+
+Provider wrappers:
+
+```ts
+const openai = mortem.wrapOpenAI(openaiClient)
+const anthropic = mortem.wrapAnthropic(anthropicClient)
+const ollama = mortem.wrapOllama(ollamaClient)
+const tools = mortem.wrapTools(vercelAiTools)
+const model = mortem.wrapLanguageModel(vercelAiModel)
+const connection = mortem.wrapConnection(solanaConnection)
+```
+
+The SDK is designed to be best effort. Buffer flush errors are swallowed and reported through the
+optional logger instead of interrupting the agent.
+
+## On-Chain Anchoring
+
+The on-chain flow has three parts:
+
+1. The user registers a `UserRegistry` PDA from the dashboard.
+2. The user funds that PDA with SOL using the generated Solana Pay QR code.
+3. The anchor worker commits Merkle roots for completed trace batches.
+
+The dashboard builds unsigned registration transactions through the server. The user signs them in
+Phantom or another Solana wallet. The backend committer wallet is only used for `commit_batch`.
+
+Useful local commands:
+
+```bash
+anchor build
+anchor test
+```
+
+If you need a devnet committer wallet:
+
+```bash
+solana-keygen new --outfile anchor-wallet.json
+solana airdrop 1 <pubkey> --url devnet
+```
+
+Put the base58-encoded secret key in `ANCHOR_WALLET_SECRET_KEY`.
+
+## Common Scripts
+
+Root scripts:
+
+```bash
+corepack pnpm build
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm typecheck
+corepack pnpm format
+```
+
+Package-specific examples:
+
+```bash
+corepack pnpm --filter @mortemlabs/shared test
+corepack pnpm --filter @mortemlabs/sdk test
+corepack pnpm --filter @mortemlabs/ingest test
+corepack pnpm --filter @mortemlabs/dashboard build
+corepack pnpm --filter @mortemlabs/server build
+```
+
+## Testing
+
+The repo has unit and integration-style coverage across the main packages:
+
+- shared hashing, canonical JSON, and Merkle utilities
+- SDK buffering and instrumentation behavior
+- ingest routes
+- workers
+- Anchor bankrun tests
+
+Run everything:
+
+```bash
+corepack pnpm test
+```
+
+Run the Anchor tests:
+
+```bash
+anchor test
+```
+
+## Production Notes
+
+- Use managed Postgres, such as Supabase Postgres 16.
+- Use Upstash Redis REST credentials for queues, live events, and rate limits.
+- Set all secrets in your deployment platform, not in committed files.
+- Keep `NEXT_PUBLIC_*` values public-safe because they are exposed to browsers.
+- Use Helius devnet RPC for the MVP unless you are intentionally moving to mainnet.
+- Keep `MORTEM_MASTER_KEY` stable if you encrypt SDK payloads. Losing it means encrypted payloads
+  cannot be decrypted.
+- Rotate agent API keys from the dashboard if a key leaks.
+- The server verifies Privy JWTs with `verifyAuthToken` only.
+
+## Troubleshooting
+
+If the dashboard shows no private data:
+
+```text
+Check NEXT_PUBLIC_PRIVY_APP_ID in apps/dashboard/.env.local.
+Check PRIVY_APP_ID and PRIVY_APP_SECRET in apps/server/.env.local.
+Restart both Next.js apps after changing env files.
+```
+
+If ingest rejects SDK batches:
+
+```text
+Confirm the agent API key was copied from the dashboard.
+Confirm the API key hash exists on the Agent record.
+Check DATABASE_URL and Redis credentials.
+Check the ingest health endpoint at /healthz.
+```
+
+If analysis never appears:
+
+```text
+Run the analysis worker.
+Check analysis:pending in Redis.
+For Ollama, make sure OLLAMA_BASE_URL has no /v1 suffix.
+For Anthropic, make sure ANTHROPIC_API_KEY is set.
+```
+
+If anchoring does not happen:
+
+```text
+Run the anchor worker.
+Confirm MORTEM_PROGRAM_ID and HELIUS_RPC_URL.
+Confirm the user and agent are registered on chain.
+Confirm the UserRegistry PDA has enough lamports.
+FundingRequired means the batch was skipped and left pending.
+```
+
+## License
+
+This repository is private while Mortem is under active development.
