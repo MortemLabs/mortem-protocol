@@ -6,6 +6,7 @@ import { getIngestEnv } from "./env.js"
 import { registerBatchRoutes } from "./routes/batch.js"
 import { registerCompleteRoutes } from "./routes/complete.js"
 import { registerHealthRoutes } from "./routes/health.js"
+import { registerLiveRoutes } from "./routes/live.js"
 
 export const createIngestServer = (): FastifyInstance => {
   const env = getIngestEnv()
@@ -28,6 +29,7 @@ export const createIngestServer = (): FastifyInstance => {
   registerBatchRoutes(server)
   registerCompleteRoutes(server)
   registerHealthRoutes(server)
+  registerLiveRoutes(server)
 
   return server
 }
