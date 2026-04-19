@@ -131,6 +131,12 @@ pub mod mortem {
 
         Ok(())
     }
+
+    pub fn close_user(ctx: Context<CloseUser>) -> Result<()> {
+        require_admin(&ctx.accounts.admin)?;
+
+        Ok(())
+    }
 }
 
 fn require_admin(admin: &Signer<'_>) -> Result<()> {
@@ -248,6 +254,20 @@ pub struct CloseAgent<'info> {
         has_one = user_registry
     )]
     pub agent_registry: Account<'info, AgentRegistry>,
+    #[account(mut, address = user_registry.owner)]
+    pub owner_wallet: SystemAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseUser<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        close = owner_wallet,
+        seeds = [USER_REGISTRY_SEED, user_registry.owner.as_ref()],
+        bump = user_registry.bump
+    )]
+    pub user_registry: Account<'info, UserRegistry>,
     #[account(mut, address = user_registry.owner)]
     pub owner_wallet: SystemAccount<'info>,
 }
