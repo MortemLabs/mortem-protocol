@@ -22,9 +22,10 @@ import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type CreatedAgent = {
-  apiKey: string
+  apiKey: string | null
   displayName: string
   id: string
+  verifyToken: string | null
 }
 
 type IntegrationTab = "openai" | "anthropic" | "vercel" | "langchain"
@@ -35,6 +36,7 @@ const previewAgent: CreatedAgent = {
   apiKey: "mtm_preview_01JAGENTKEY",
   displayName: "yield-hunter-v2",
   id: "01JAGENTPREVIEWNEW",
+  verifyToken: "mrt_verify_a3f9c2d1",
 }
 const previewConnection = {
   connected: true,
@@ -105,6 +107,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
         apiKey: result.apiKey,
         displayName: result.agent.displayName,
         id: result.agent.id,
+        verifyToken: result.verifyToken,
       })
       setCurrentStep(2)
       setLocalError(null)
@@ -309,7 +312,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                   />
                   <CopyBlock
                     label="Environment variables"
-                    value={`MORTEM_API_KEY=${createdAgent.apiKey}\nMORTEM_AGENT_ID=${createdAgent.id}`}
+                    value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}`}
                   />
                   <Button type="button" onClick={() => setCurrentStep(3)}>
                     I&apos;ve added this
@@ -362,6 +365,10 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       ))}
                     </div>
                     <CodeBlock label={integrationExample.label} value={integrationExample.code} />
+                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                      The verify token proves you control this agent. You can remove it from your
+                      code after Mortem confirms the connection.
+                    </div>
                   </div>
 
                   <CopyBlock
@@ -719,11 +726,8 @@ function formatDateTime(value: Date): string {
   }).format(value)
 }
 
-function getIntegrationExample(
-  tab: IntegrationTab,
-  createdAgent: CreatedAgent,
-): Readonly<{ code: string; label: string }> {
-  const baseConfig = `import { Mortem } from "@mortemlabs/sdk"\n\nconst mortem = new Mortem({\n  apiKey: "${createdAgent.apiKey}",\n  agentId: "${createdAgent.id}",\n})`
+function getIntegrationExample(tab: IntegrationTab): Readonly<{ code: string; label: string }> {
+  const baseConfig = `import { Mortem } from "@mortemlabs/sdk"\n\nconst mortem = new Mortem({\n  apiKey: process.env.MORTEM_API_KEY!,\n  agentId: process.env.MORTEM_AGENT_ID!,\n  verifyToken: process.env.MORTEM_VERIFY_TOKEN, // remove after verified\n})`
 
   switch (tab) {
     case "openai":
@@ -750,16 +754,25 @@ function getIntegrationExample(
 }
 
 function getAssistantPrompt(createdAgent: CreatedAgent): string {
+  const apiKey = createdAgent.apiKey ?? "<shown-once>"
+  const verifyToken = createdAgent.verifyToken ?? "<shown-once>"
+
   return `Add Mortem observability to this agent.
 
 Install: npm install @mortemlabs/sdk
+
+Use these env vars:
+MORTEM_API_KEY="${apiKey}"
+MORTEM_AGENT_ID="${createdAgent.id}"
+MORTEM_VERIFY_TOKEN="${verifyToken}"
 
 Add to your agent's entry point:
 
 import { Mortem } from "@mortemlabs/sdk"
 const mortem = new Mortem({
-  apiKey: "${createdAgent.apiKey}",
-  agentId: "${createdAgent.id}",
+  apiKey: process.env.MORTEM_API_KEY!,
+  agentId: process.env.MORTEM_AGENT_ID!,
+  verifyToken: process.env.MORTEM_VERIFY_TOKEN,
 })
 
 Then:
@@ -769,5 +782,6 @@ Then:
 - If you use LangChain: add mortem.langchainHandler() to your model's callbacks
 - If you send Solana transactions: wrap the Connection with mortem.wrapConnection(connection)
 
-Do not change any other agent logic. The wrapper intercepts calls transparently.`
+Do not change any other agent logic. The wrapper intercepts calls transparently.
+Keep MORTEM_VERIFY_TOKEN in place until Mortem confirms verification, then remove it.`
 }
