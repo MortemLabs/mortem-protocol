@@ -5,6 +5,7 @@ import prisma from "@mortemlabs/db"
 import { sha256 } from "@mortemlabs/shared"
 import { ulid } from "ulid"
 import { z } from "zod"
+import { addWalletToWebhook, removeWalletFromWebhook } from "../../lib/helius"
 import { createTRPCRouter, protectedProcedure } from "../trpc"
 
 const EnvironmentSchema = z.enum(["devnet", "mainnet"])
@@ -35,6 +36,7 @@ export const agentsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
+        agentWallet: z.string().min(1).optional(),
         displayName: z.string().min(1),
         environment: EnvironmentSchema.default("devnet"),
         privateMode: z.boolean().default(false),
@@ -53,6 +55,7 @@ export const agentsRouter = createTRPCRouter({
       const agent = await prisma.agent.create({
         data: {
           apiKeyHash: sha256(apiKey),
+          agentWallet: input.agentWallet ?? null,
           displayName: input.displayName,
           environment: input.environment,
           id: agentId,
@@ -67,6 +70,9 @@ export const agentsRouter = createTRPCRouter({
           },
         },
       })
+      if (input.agentWallet !== undefined) {
+        await addWalletToWebhook(input.agentWallet)
+      }
 
       return { agent, apiKey }
     }),
@@ -96,7 +102,7 @@ export const agentsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await prisma.agent.findFirst({
-        select: { id: true },
+        select: { agentWallet: true, id: true },
         where: { id: input.id, ownerId: ctx.userId },
       })
 
@@ -105,6 +111,11 @@ export const agentsRouter = createTRPCRouter({
       }
 
       await prisma.agent.delete({ where: { id: input.id } })
+
+      if (existing.agentWallet !== null) {
+        await removeWalletFromWebhook(existing.agentWallet)
+      }
+
       return true
     }),
 })
