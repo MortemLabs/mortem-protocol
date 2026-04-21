@@ -6,7 +6,16 @@ import { trpc, useDashboardAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { usePrivy } from "@privy-io/react-auth"
-import { AlertCircle, ArrowLeft, Check, CheckCircle2, Copy, Loader2, Lock } from "lucide-react"
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Copy,
+  Loader2,
+  Lock,
+} from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
@@ -17,6 +26,7 @@ type CreatedAgent = {
   id: string
 }
 
+type IntegrationTab = "openai" | "anthropic" | "vercel" | "langchain"
 type StepNumber = 1 | 2 | 3 | 4
 type StepState = "active" | "complete" | "future"
 
@@ -25,6 +35,12 @@ const previewAgent: CreatedAgent = {
   displayName: "yield-hunter-v2",
   id: "01JAGENTPREVIEWNEW",
 }
+const integrationTabs: Array<{ label: string; value: IntegrationTab }> = [
+  { label: "OpenAI", value: "openai" },
+  { label: "Anthropic", value: "anthropic" },
+  { label: "Vercel AI SDK", value: "vercel" },
+  { label: "LangChain", value: "langchain" },
+]
 
 export function AgentOnboardingWizard() {
   const { privyEnabled } = useDashboardAuth()
@@ -61,6 +77,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const utils = trpc.useUtils()
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [displayName, setDisplayName] = useState("yield-hunter-v2")
+  const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationTab>("openai")
+  const [isAssistantPromptOpen, setIsAssistantPromptOpen] = useState(false)
   const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(
     mode === "preview" ? previewAgent : null,
   )
@@ -95,6 +113,9 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const stepTwoState = resolveStepState(2, currentStep, createdAgent)
   const stepThreeState = resolveStepState(3, currentStep, createdAgent)
   const stepFourState = resolveStepState(4, currentStep, createdAgent)
+  const integrationExample =
+    createdAgent === null ? null : getIntegrationExample(activeIntegrationTab, createdAgent)
+  const assistantPrompt = createdAgent === null ? null : getAssistantPrompt(createdAgent)
 
   const submitStepOne = async () => {
     if (nameError !== null) {
@@ -246,9 +267,97 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               description="Add the wrapper once the SDK is installed."
               number={3}
               state={stepThreeState}
+              summary={
+                createdAgent === null
+                  ? null
+                  : "Code snippets and the AI assistant prompt are ready to paste."
+              }
               title="Wrap your agent"
+              {...(currentStep > 3 ? { onEdit: () => setCurrentStep(3) } : {})}
             >
-              <LockedStepBody />
+              {createdAgent === null || integrationExample === null || assistantPrompt === null ? (
+                <LockedStepBody />
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground">
+                        Add one line to your agent
+                      </h3>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Pick the SDK you already use. Mortem wraps the client without changing the
+                        rest of your agent flow.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {integrationTabs.map((tab) => (
+                        <button
+                          key={tab.value}
+                          type="button"
+                          onClick={() => setActiveIntegrationTab(tab.value)}
+                          className={cn(
+                            "rounded-md border px-3 py-2 text-sm font-medium transition",
+                            activeIntegrationTab === tab.value
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                          )}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                    <CodeBlock label={integrationExample.label} value={integrationExample.code} />
+                  </div>
+
+                  <CopyBlock
+                    label="Wrap your Solana connection"
+                    value={
+                      "const connection = mortem.wrapConnection(\n  new Connection(process.env.RPC_URL!)\n)"
+                    }
+                  />
+
+                  <div className="rounded-md border border-border bg-background">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssistantPromptOpen((current) => !current)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Using an AI coding assistant?
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Copy a ready-to-paste prompt for Claude Code or Codex.
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                        Copy this prompt for Claude Code or Codex
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 transition",
+                            isAssistantPromptOpen && "rotate-180",
+                          )}
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </button>
+
+                    {isAssistantPromptOpen ? (
+                      <div className="border-t border-border px-4 py-4">
+                        <CopyBlock
+                          label="AI assistant prompt"
+                          value={assistantPrompt}
+                          copyLabel="Copy AI prompt"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <Button type="button" onClick={() => setCurrentStep(4)}>
+                    I&apos;ve added this
+                  </Button>
+                </div>
+              )}
             </WizardStep>
 
             <WizardStep
@@ -257,7 +366,14 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               state={stepFourState}
               title="Listening for your agent…"
             >
-              <LockedStepBody />
+              {createdAgent === null || currentStep < 4 ? (
+                <LockedStepBody />
+              ) : (
+                <div className="rounded-md border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
+                  The connection check lands in the next commit. For now, run your agent once and
+                  keep this page open.
+                </div>
+              )}
             </WizardStep>
           </div>
         </section>
@@ -353,7 +469,22 @@ function LockedStepBody() {
   )
 }
 
-function CopyBlock({ label, value }: Readonly<{ label: string; value: string }>) {
+function CodeBlock({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="rounded-md border border-border bg-background">
+      <div className="border-b border-border px-4 py-3">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+      </div>
+      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">{value}</pre>
+    </div>
+  )
+}
+
+function CopyBlock({
+  copyLabel = "Copy",
+  label,
+  value,
+}: Readonly<{ copyLabel?: string; label: string; value: string }>) {
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
@@ -382,7 +513,7 @@ function CopyBlock({ label, value }: Readonly<{ label: string; value: string }>)
           ) : (
             <Copy className="h-4 w-4" aria-hidden="true" />
           )}
-          {copied ? "Copied" : "Copy"}
+          {copied ? "Copied" : copyLabel}
         </Button>
       </div>
       <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">{value}</pre>
@@ -455,4 +586,57 @@ function resolveStepState(
   }
 
   return currentStep > step ? "complete" : "future"
+}
+
+function getIntegrationExample(
+  tab: IntegrationTab,
+  createdAgent: CreatedAgent,
+): Readonly<{ code: string; label: string }> {
+  const baseConfig = `import { Mortem } from "@mortemlabs/sdk"\n\nconst mortem = new Mortem({\n  apiKey: "${createdAgent.apiKey}",\n  agentId: "${createdAgent.id}",\n})`
+
+  switch (tab) {
+    case "openai":
+      return {
+        label: "OpenAI",
+        code: `${baseConfig}\nimport OpenAI from "openai"\n\n// Wrap your existing OpenAI client\nconst openai = mortem.wrapOpenAI(new OpenAI())\n\n// Then use openai exactly as before\n// Every call is now traced automatically`,
+      }
+    case "anthropic":
+      return {
+        label: "Anthropic",
+        code: `${baseConfig}\nimport Anthropic from "@anthropic-ai/sdk"\n\n// Wrap your existing Anthropic client\nconst anthropic = mortem.wrapAnthropic(new Anthropic())\n\n// Then use anthropic exactly as before\n// Every call is now traced automatically`,
+      }
+    case "vercel":
+      return {
+        label: "Vercel AI SDK",
+        code: `${baseConfig}\nimport { tools } from "./tools"\n\n// Wrap your existing AI SDK tools\nconst tracedTools = mortem.wrapTools(tools)\n\n// Use tracedTools exactly as before in generateText or streamText`,
+      }
+    case "langchain":
+      return {
+        label: "LangChain",
+        code: `${baseConfig}\nimport { ChatOpenAI } from "@langchain/openai"\n\nconst model = new ChatOpenAI({ model: "gpt-4.1-mini" }).withConfig({\n  callbacks: [mortem.langchainHandler()],\n})\n\n// Then use model exactly as before`,
+      }
+  }
+}
+
+function getAssistantPrompt(createdAgent: CreatedAgent): string {
+  return `Add Mortem observability to this agent.
+
+Install: npm install @mortemlabs/sdk
+
+Add to your agent's entry point:
+
+import { Mortem } from "@mortemlabs/sdk"
+const mortem = new Mortem({
+  apiKey: "${createdAgent.apiKey}",
+  agentId: "${createdAgent.id}",
+})
+
+Then:
+- If you use OpenAI: wrap the client with mortem.wrapOpenAI(client)
+- If you use Anthropic: mortem.wrapAnthropic(client)
+- If you use Vercel AI SDK tools: mortem.wrapTools(tools)
+- If you use LangChain: add mortem.langchainHandler() to your model's callbacks
+- If you send Solana transactions: wrap the Connection with mortem.wrapConnection(connection)
+
+Do not change any other agent logic. The wrapper intercepts calls transparently.`
 }
