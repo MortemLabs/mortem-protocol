@@ -16,6 +16,10 @@ const agentAccessWhere = (agentId: string, userId: string) => ({
 })
 
 const createApiKey = (): string => `mtm_${randomBytes(32).toString("base64url")}`
+const AgentDisplayNameSchema = z
+  .string()
+  .min(1)
+  .regex(/^\S+$/u, "Agent name cannot contain spaces")
 
 export const agentsRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) =>
@@ -37,7 +41,7 @@ export const agentsRouter = createTRPCRouter({
     .input(
       z.object({
         agentWallet: z.string().min(1).optional(),
-        displayName: z.string().min(1),
+        displayName: AgentDisplayNameSchema,
         environment: EnvironmentSchema.default("devnet"),
         privateMode: z.boolean().default(false),
         retentionDays: z.number().int().min(1).max(365).default(30),
