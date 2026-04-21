@@ -18,6 +18,7 @@ import {
   RefreshCcw,
 } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
@@ -44,6 +45,11 @@ const previewConnection = {
   firstTraceId: "01JPREVIEWTRACE0001",
   verified: true,
 }
+const POLL_INTERVAL_MS = 4_000
+const POLL_TIMEOUT_MS = 4 * 60 * 1_000
+const ingestBatchUrl = `${
+  process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
+}/v1/traces/batch`
 const integrationTabs: Array<{ label: string; value: IntegrationTab }> = [
   { label: "OpenAI", value: "openai" },
   { label: "Anthropic", value: "anthropic" },
@@ -83,7 +89,9 @@ function AuthenticatedAgentOnboardingWizard() {
 }
 
 function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
+  const searchParams = useSearchParams()
   const utils = trpc.useUtils()
+  const resumeAgentId = mode === "private" ? searchParams.get("agentId") : null
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [displayName, setDisplayName] = useState("yield-hunter-v2")
   const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationTab>("openai")
@@ -94,6 +102,14 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const [localError, setLocalError] = useState<string | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const connectionPollRef = useRef<number | null>(null)
+  const pollingStartedAtRef = useRef<number | null>(null)
+  const resumeAgent = trpc.agents.get.useQuery(
+    { id: resumeAgentId ?? "" },
+    {
+      enabled: mode === "private" && resumeAgentId !== null && createdAgent === null,
+      retry: 1,
+    },
+  )
   const connectionCheck = trpc.agents.checkConnection.useQuery(
     { agentId: createdAgent?.id ?? previewAgent.id },
     {
@@ -134,9 +150,14 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const stepTwoState = resolveStepState(2, currentStep, createdAgent)
   const stepThreeState = resolveStepState(3, currentStep, createdAgent)
   const stepFourState = resolveStepState(4, currentStep, createdAgent)
+  const hasVerifyCredentials =
+    createdAgent !== null && createdAgent.apiKey !== null && createdAgent.verifyToken !== null
   const integrationExample =
-    createdAgent === null ? null : getIntegrationExample(activeIntegrationTab, createdAgent)
-  const assistantPrompt = createdAgent === null ? null : getAssistantPrompt(createdAgent)
+    createdAgent === null || !hasVerifyCredentials
+      ? null
+      : getIntegrationExample(activeIntegrationTab)
+  const assistantPrompt =
+    createdAgent === null || !hasVerifyCredentials ? null : getAssistantPrompt(createdAgent)
   const connectionState = mode === "preview" ? previewConnection : connectionCheck.data
   const isConnected = connectionState?.connected === true
   const isVerified = connectionState?.verified === true
@@ -153,20 +174,74 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
     connectionPollRef.current = null
   }, [])
 
-  useEffect(() => {
-    stopConnectionPolling()
-
-    if (mode !== "private" || createdAgentId === null || currentStep !== 4 || isConnected) {
-      return stopConnectionPolling
+  const startConnectionPolling = useCallback(() => {
+    if (mode !== "private" || createdAgentId === null || currentStep !== 4) {
+      return
     }
 
+    stopConnectionPolling()
+    pollingStartedAtRef.current = Date.now()
+    setTimedOut(false)
     void refetchConnection()
     connectionPollRef.current = window.setInterval(() => {
+      if (
+        pollingStartedAtRef.current !== null &&
+        Date.now() - pollingStartedAtRef.current > POLL_TIMEOUT_MS
+      ) {
+        stopConnectionPolling()
+        setTimedOut(true)
+        return
+      }
+
       void refetchConnection()
-    }, 5_000)
+    }, POLL_INTERVAL_MS)
+  }, [createdAgentId, currentStep, mode, refetchConnection, stopConnectionPolling])
+
+  useEffect(() => {
+    if (mode !== "private" || resumeAgentId === null || createdAgent !== null) {
+      return
+    }
+
+    if (resumeAgent.data === undefined || resumeAgent.data === null) {
+      return
+    }
+
+    setCreatedAgent({
+      apiKey: null,
+      displayName: resumeAgent.data.displayName,
+      id: resumeAgent.data.id,
+      verifyToken: null,
+    })
+    setCurrentStep(4)
+    setLocalError(null)
+    setTimedOut(false)
+  }, [createdAgent, mode, resumeAgent.data, resumeAgentId])
+
+  useEffect(() => {
+    if (mode !== "private" || createdAgentId === null || currentStep !== 4) {
+      stopConnectionPolling()
+      return
+    }
+
+    if (isVerified || timedOut) {
+      stopConnectionPolling()
+      return
+    }
+
+    if (connectionPollRef.current === null) {
+      startConnectionPolling()
+    }
 
     return stopConnectionPolling
-  }, [createdAgentId, currentStep, isConnected, mode, refetchConnection, stopConnectionPolling])
+  }, [
+    createdAgentId,
+    currentStep,
+    isVerified,
+    mode,
+    startConnectionPolling,
+    stopConnectionPolling,
+    timedOut,
+  ])
 
   const submitStepOne = async () => {
     if (nameError !== null) {
@@ -194,11 +269,27 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
       return
     }
 
-    stopConnectionPolling()
-    void refetchConnection()
-    connectionPollRef.current = window.setInterval(() => {
-      void refetchConnection()
-    }, 5_000)
+    startConnectionPolling()
+  }
+
+  if (mode === "private" && resumeAgentId !== null && createdAgent === null) {
+    if (resumeAgent.isLoading) {
+      return (
+        <WizardMessage
+          title="Loading agent setup…"
+          description="Preparing the verification step for your existing agent."
+        />
+      )
+    }
+
+    if (resumeAgent.isError || resumeAgent.data === null) {
+      return (
+        <WizardMessage
+          title="Agent did not load."
+          description="The setup link may be stale or the agent may be outside your workspace."
+        />
+      )
+    }
   }
 
   return (
@@ -215,11 +306,13 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
           <aside className="space-y-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Agent onboarding</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-normal">Add a new agent</h1>
+              <h1 className="mt-2 text-3xl font-semibold tracking-normal">
+                {resumeAgentId === null ? "Add a new agent" : "Finish agent setup"}
+              </h1>
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              Create an API key, wire the SDK into your agent, and wait for the first trace to prove
-              the connection.
+              Create an API key, wire the SDK into your agent, and wait for the first trace plus the
+              verify token proof to confirm the connection.
             </p>
             {mode === "preview" ? (
               <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
@@ -240,7 +333,6 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                   : `${createdAgent.displayName} created · ${createdAgent.id}`
               }
               title="Name your agent"
-              {...(createdAgent === null ? {} : { onEdit: () => setCurrentStep(1) })}
             >
               {createdAgent === null ? (
                 <div className="space-y-4">
@@ -280,8 +372,9 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4 text-sm text-emerald-900 dark:text-emerald-100">
-                    Your agent is already created. Continue below to install the SDK and connect the
-                    first trace.
+                    {hasVerifyCredentials
+                      ? "Your agent is already created. Continue below to install the SDK and connect the first trace."
+                      : "This agent is already created. Continue below to finish verification."}
                   </div>
                   <SummaryGrid
                     rows={[
@@ -289,8 +382,11 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       ["Agent ID", createdAgent.id],
                     ]}
                   />
-                  <Button type="button" onClick={() => setCurrentStep(2)}>
-                    Continue to install
+                  <Button
+                    type="button"
+                    onClick={() => setCurrentStep(hasVerifyCredentials ? 2 : 4)}
+                  >
+                    {hasVerifyCredentials ? "Continue to install" : "Continue to verification"}
                   </Button>
                 </div>
               )}
@@ -303,10 +399,14 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               summary={
                 createdAgent === null
                   ? null
-                  : "SDK install command and Mortem credentials are ready."
+                  : hasVerifyCredentials
+                    ? "SDK install command and Mortem credentials are ready."
+                    : "Credentials were shown once when this agent was created."
               }
               title="Install the SDK"
-              {...(currentStep > 2 ? { onEdit: () => setCurrentStep(2) } : {})}
+              {...(currentStep > 2 && hasVerifyCredentials
+                ? { onEdit: () => setCurrentStep(2) }
+                : {})}
             >
               {createdAgent === null ? (
                 <LockedStepBody />
@@ -320,8 +420,17 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     label="Environment variables"
                     value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}`}
                   />
-                  <Button type="button" onClick={() => setCurrentStep(3)}>
-                    I&apos;ve added this
+                  {hasVerifyCredentials ? null : (
+                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                      The API key and verify token are only shown when the agent is first created.
+                      If you already added them, continue to the verification step below.
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => setCurrentStep(hasVerifyCredentials ? 3 : 4)}
+                  >
+                    {hasVerifyCredentials ? "I've added this" : "Continue to verification"}
                   </Button>
                 </div>
               )}
@@ -334,13 +443,22 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               summary={
                 createdAgent === null
                   ? null
-                  : "Code snippets and the AI assistant prompt are ready to paste."
+                  : hasVerifyCredentials
+                    ? "Code snippets and the AI assistant prompt are ready to paste."
+                    : "Your agent only needs to finish the verification check now."
               }
               title="Wrap your agent"
-              {...(currentStep > 3 ? { onEdit: () => setCurrentStep(3) } : {})}
+              {...(currentStep > 3 && hasVerifyCredentials
+                ? { onEdit: () => setCurrentStep(3) }
+                : {})}
             >
-              {createdAgent === null || integrationExample === null || assistantPrompt === null ? (
+              {createdAgent === null ? (
                 <LockedStepBody />
+              ) : integrationExample === null || assistantPrompt === null ? (
+                <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                  This agent is already past the install step. If the SDK is in place, continue to
+                  the verification check below.
+                </div>
               ) : (
                 <div className="space-y-6">
                   <div className="space-y-3">
@@ -516,9 +634,55 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                           </Button>
                         )}
                         <Button asChild variant="outline">
-                          <Link href={`/app/agents/${createdAgent.id}`}>Go to dashboard</Link>
+                          <Link href={`/app/agents/${createdAgent.id}`}>Go to dashboard -&gt;</Link>
                         </Button>
                       </div>
+                    </div>
+                  ) : timedOut ? (
+                    <div className="rounded-md border border-border bg-muted/20 p-4">
+                      <p className="text-sm font-medium text-foreground">
+                        Troubleshooting checklist
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                        <p>
+                          □ Is <code>MORTEM_API_KEY</code> correct?
+                        </p>
+                        <p>
+                          □ Is <code>MORTEM_VERIFY_TOKEN</code> set in your env?
+                        </p>
+                        <p>
+                          □ Did your agent actually run and make at least one LLM call or tool call?
+                        </p>
+                        <p>
+                          □ Is your agent posting to the right endpoint?{" "}
+                          <code>{ingestBatchUrl}</code>
+                        </p>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Button type="button" variant="secondary" onClick={refreshConnection}>
+                          <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+                          Try again
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href={`/app/agents/${createdAgent.id}`}>Skip for now</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : isWaitingForVerification ? (
+                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4">
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                        Agent reached Mortem - waiting for verify token...
+                      </p>
+                      {connectionState?.firstSeenAt === null ||
+                      connectionState?.firstSeenAt === undefined ? null : (
+                        <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                          First trace received {formatDateTime(connectionState.firstSeenAt)}.
+                        </p>
+                      )}
+                      <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                        Make sure <code>MORTEM_VERIFY_TOKEN</code> is set in your env and run your
+                        agent again.
+                      </p>
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-3">
@@ -530,7 +694,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                         Refresh
                       </Button>
                       <p className="text-sm text-muted-foreground">
-                        Mortem checks every 5 seconds while this step stays open.
+                        Mortem checks every 4 seconds for up to 4 minutes while this step stays
+                        open.
                       </p>
                     </div>
                   )}
