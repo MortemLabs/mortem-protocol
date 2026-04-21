@@ -6,7 +6,7 @@ import { trpc, useDashboardAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { usePrivy } from "@privy-io/react-auth"
-import { AlertCircle, ArrowLeft, Check, CheckCircle2, Lock, Loader2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, Copy, Loader2, Lock } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
@@ -133,8 +133,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               <h1 className="mt-2 text-3xl font-semibold tracking-normal">Add a new agent</h1>
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              Create an API key, wire the SDK into your agent, and wait for the first trace to
-              prove the connection.
+              Create an API key, wire the SDK into your agent, and wait for the first trace to prove
+              the connection.
             </p>
             {mode === "preview" ? (
               <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
@@ -195,8 +195,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4 text-sm text-emerald-900 dark:text-emerald-100">
-                    Your agent is already created. Continue below to install the SDK and connect
-                    the first trace.
+                    Your agent is already created. Continue below to install the SDK and connect the
+                    first trace.
                   </div>
                   <SummaryGrid
                     rows={[
@@ -215,9 +215,31 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               description="Install the SDK after the agent exists so the real credentials are ready."
               number={2}
               state={stepTwoState}
+              summary={
+                createdAgent === null
+                  ? null
+                  : "SDK install command and Mortem credentials are ready."
+              }
               title="Install the SDK"
+              {...(currentStep > 2 ? { onEdit: () => setCurrentStep(2) } : {})}
             >
-              <LockedStepBody />
+              {createdAgent === null ? (
+                <LockedStepBody />
+              ) : (
+                <div className="space-y-5">
+                  <CopyBlock
+                    label="Install command"
+                    value={"npm install @mortemlabs/sdk\n# or\npnpm add @mortemlabs/sdk"}
+                  />
+                  <CopyBlock
+                    label="Environment variables"
+                    value={`MORTEM_API_KEY=${createdAgent.apiKey}\nMORTEM_AGENT_ID=${createdAgent.id}`}
+                  />
+                  <Button type="button" onClick={() => setCurrentStep(3)}>
+                    I&apos;ve added this
+                  </Button>
+                </div>
+              )}
             </WizardStep>
 
             <WizardStep
@@ -327,6 +349,43 @@ function LockedStepBody() {
     <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
       <Lock className="h-4 w-4" aria-hidden="true" />
       Complete the previous step to unlock this section.
+    </div>
+  )
+}
+
+function CopyBlock({ label, value }: Readonly<{ label: string; value: string }>) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <Button
+          type="button"
+          variant={copied ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => void copy()}
+          className={cn(copied && "border-emerald-600/30 text-emerald-700 dark:text-emerald-300")}
+        >
+          {copied ? (
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Copy className="h-4 w-4" aria-hidden="true" />
+          )}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">{value}</pre>
     </div>
   )
 }
