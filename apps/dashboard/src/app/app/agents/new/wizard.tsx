@@ -15,10 +15,11 @@ import {
   Copy,
   Loader2,
   Lock,
+  RefreshCcw,
 } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type CreatedAgent = {
   apiKey: string
@@ -34,6 +35,11 @@ const previewAgent: CreatedAgent = {
   apiKey: "mtm_preview_01JAGENTKEY",
   displayName: "yield-hunter-v2",
   id: "01JAGENTPREVIEWNEW",
+}
+const previewConnection = {
+  connected: true,
+  firstSeenAt: new Date("2026-04-21T09:30:00.000Z"),
+  firstTraceId: "01JPREVIEWTRACE0001",
 }
 const integrationTabs: Array<{ label: string; value: IntegrationTab }> = [
   { label: "OpenAI", value: "openai" },
@@ -83,6 +89,15 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
     mode === "preview" ? previewAgent : null,
   )
   const [localError, setLocalError] = useState<string | null>(null)
+  const connectionPollRef = useRef<number | null>(null)
+  const connectionCheck = trpc.agents.checkConnection.useQuery(
+    { agentId: createdAgent?.id ?? previewAgent.id },
+    {
+      enabled: false,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  )
 
   const createAgent = trpc.agents.create.useMutation({
     onSuccess: async (result) => {
@@ -116,6 +131,34 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const integrationExample =
     createdAgent === null ? null : getIntegrationExample(activeIntegrationTab, createdAgent)
   const assistantPrompt = createdAgent === null ? null : getAssistantPrompt(createdAgent)
+  const connectionState = mode === "preview" ? previewConnection : connectionCheck.data
+  const isConnected = connectionState?.connected === true
+  const createdAgentId = createdAgent?.id ?? null
+  const refetchConnection = connectionCheck.refetch
+
+  const stopConnectionPolling = useCallback(() => {
+    if (connectionPollRef.current === null) {
+      return
+    }
+
+    window.clearInterval(connectionPollRef.current)
+    connectionPollRef.current = null
+  }, [])
+
+  useEffect(() => {
+    stopConnectionPolling()
+
+    if (mode !== "private" || createdAgentId === null || currentStep !== 4 || isConnected) {
+      return stopConnectionPolling
+    }
+
+    void refetchConnection()
+    connectionPollRef.current = window.setInterval(() => {
+      void refetchConnection()
+    }, 5_000)
+
+    return stopConnectionPolling
+  }, [createdAgentId, currentStep, isConnected, mode, refetchConnection, stopConnectionPolling])
 
   const submitStepOne = async () => {
     if (nameError !== null) {
@@ -135,6 +178,18 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
 
     setLocalError(null)
     await createAgent.mutateAsync({ displayName: trimmedName })
+  }
+
+  const refreshConnection = () => {
+    if (mode !== "private" || createdAgent === null || currentStep !== 4) {
+      return
+    }
+
+    stopConnectionPolling()
+    void refetchConnection()
+    connectionPollRef.current = window.setInterval(() => {
+      void refetchConnection()
+    }, 5_000)
   }
 
   return (
@@ -369,9 +424,78 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               {createdAgent === null || currentStep < 4 ? (
                 <LockedStepBody />
               ) : (
-                <div className="rounded-md border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
-                  The connection check lands in the next commit. For now, run your agent once and
-                  keep this page open.
+                <div className="space-y-5">
+                  <div className="flex items-start gap-3 rounded-md border border-border bg-background p-4">
+                    {isConnected ? (
+                      <CheckCircle2
+                        className="mt-0.5 h-5 w-5 text-emerald-600"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span
+                        className="mt-1 h-3 w-3 rounded-full bg-primary animate-pulse"
+                        aria-hidden="true"
+                      />
+                    )}
+
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {isConnected
+                          ? "Agent connected! First trace received."
+                          : "Waiting for first trace"}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Run your agent once to verify the connection.
+                      </p>
+                    </div>
+                  </div>
+
+                  {connectionCheck.error === null || mode === "preview" ? null : (
+                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                      The dashboard could not check the connection just now. Try another refresh in
+                      a moment.
+                    </div>
+                  )}
+
+                  {isConnected ? (
+                    <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4">
+                      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                        Agent connected! First trace received.
+                      </p>
+                      {connectionState?.firstSeenAt === null ||
+                      connectionState?.firstSeenAt === undefined ? null : (
+                        <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-200">
+                          First seen {formatDateTime(connectionState.firstSeenAt)}.
+                        </p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {connectionState?.firstTraceId === null ||
+                        connectionState?.firstTraceId === undefined ? null : (
+                          <Button asChild>
+                            <Link href={`/app/traces/${connectionState.firstTraceId}`}>
+                              View trace
+                            </Link>
+                          </Button>
+                        )}
+                        <Button asChild variant="outline">
+                          <Link href={`/app/agents/${createdAgent.id}`}>Go to dashboard</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button type="button" variant="secondary" onClick={refreshConnection}>
+                        <RefreshCcw
+                          className={cn("h-4 w-4", connectionCheck.isFetching && "animate-spin")}
+                          aria-hidden="true"
+                        />
+                        Refresh
+                      </Button>
+                      <p className="text-sm text-muted-foreground">
+                        Mortem checks every 5 seconds while this step stays open.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </WizardStep>
@@ -586,6 +710,13 @@ function resolveStepState(
   }
 
   return currentStep > step ? "complete" : "future"
+}
+
+function formatDateTime(value: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value)
 }
 
 function getIntegrationExample(
