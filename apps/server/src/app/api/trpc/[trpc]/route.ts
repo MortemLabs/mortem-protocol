@@ -40,10 +40,10 @@ const withCors = (response: Response, request: Request): Response => {
 const handler = async (request: Request) =>
   withCors(
     await fetchRequestHandler({
-    createContext: () => createTRPCContext(request),
-    endpoint: "/api/trpc",
-    req: request,
-    router: appRouter,
+      createContext: () => createTRPCContext(request),
+      endpoint: "/api/trpc",
+      req: request,
+      router: appRouter,
     }),
     request,
   )

@@ -30,6 +30,7 @@ type CreatedAgent = {
 }
 
 type IntegrationTab = "openai" | "anthropic" | "vercel" | "langchain"
+type CodeLanguage = "bash" | "dotenv" | "text" | "typescript"
 type StepNumber = 1 | 2 | 3 | 4
 type StepState = "active" | "complete" | "future"
 
@@ -414,10 +415,12 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                 <div className="space-y-5">
                   <CopyBlock
                     label="Install command"
+                    language="bash"
                     value={"npm install @mortemlabs/sdk\n# or\npnpm add @mortemlabs/sdk"}
                   />
                   <CopyBlock
                     label="Environment variables"
+                    language="dotenv"
                     value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}`}
                   />
                   {hasVerifyCredentials ? null : (
@@ -488,7 +491,11 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                         </button>
                       ))}
                     </div>
-                    <CodeBlock label={integrationExample.label} value={integrationExample.code} />
+                    <CodeBlock
+                      label={integrationExample.label}
+                      language="typescript"
+                      value={integrationExample.code}
+                    />
                     <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
                       The verify token proves you control this agent. You can remove it from your
                       code after Mortem confirms the connection.
@@ -500,6 +507,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     value={
                       "const connection = mortem.wrapConnection(\n  new Connection(process.env.RPC_URL!)\n)"
                     }
+                    language="typescript"
                   />
 
                   <div className="rounded-md border border-border bg-background">
@@ -534,6 +542,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                           label="AI assistant prompt"
                           value={assistantPrompt}
                           copyLabel="Copy AI prompt"
+                          language="text"
                         />
                       </div>
                     ) : null}
@@ -796,13 +805,19 @@ function LockedStepBody() {
   )
 }
 
-function CodeBlock({ label, value }: Readonly<{ label: string; value: string }>) {
+function CodeBlock({
+  label,
+  language = "text",
+  value,
+}: Readonly<{ label: string; language?: CodeLanguage; value: string }>) {
   return (
     <div className="rounded-md border border-border bg-background">
       <div className="border-b border-border px-4 py-3">
         <p className="text-sm font-medium text-foreground">{label}</p>
       </div>
-      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">{value}</pre>
+      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">
+        <code>{renderHighlightedCode(value, language)}</code>
+      </pre>
     </div>
   )
 }
@@ -810,8 +825,9 @@ function CodeBlock({ label, value }: Readonly<{ label: string; value: string }>)
 function CopyBlock({
   copyLabel = "Copy",
   label,
+  language = "text",
   value,
-}: Readonly<{ copyLabel?: string; label: string; value: string }>) {
+}: Readonly<{ copyLabel?: string; label: string; language?: CodeLanguage; value: string }>) {
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
@@ -843,7 +859,9 @@ function CopyBlock({
           {copied ? "Copied" : copyLabel}
         </Button>
       </div>
-      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">{value}</pre>
+      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">
+        <code>{renderHighlightedCode(value, language)}</code>
+      </pre>
     </div>
   )
 }
@@ -920,6 +938,125 @@ function formatDateTime(value: Date): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(value)
+}
+
+function renderHighlightedCode(value: string, language: CodeLanguage): ReactNode[] {
+  const tokens = getHighlightPattern(language)
+  const parts: ReactNode[] = []
+  let cursor = 0
+
+  for (const match of value.matchAll(tokens.pattern)) {
+    const index = match.index ?? 0
+    const token = match[0]
+
+    if (index > cursor) {
+      parts.push(value.slice(cursor, index))
+    }
+
+    parts.push(
+      <span key={`${language}-${index}`} className={tokens.className(token)}>
+        {token}
+      </span>,
+    )
+    cursor = index + token.length
+  }
+
+  if (cursor < value.length) {
+    parts.push(value.slice(cursor))
+  }
+
+  return parts
+}
+
+function getHighlightPattern(language: CodeLanguage): Readonly<{
+  className: (token: string) => string
+  pattern: RegExp
+}> {
+  switch (language) {
+    case "bash":
+      return {
+        pattern:
+          /(#[^\n]*|\b(?:npm|pnpm|npx|corepack|node|bun)\b|@[a-z0-9-]+(?:\/[a-z0-9-]+)?|\b[a-z-]+(?==)|"(?:\\.|[^"])*"|'(?:\\.|[^'])*')/gim,
+        className: (token) => {
+          if (token.startsWith("#")) {
+            return "text-muted-foreground"
+          }
+
+          if (token.startsWith("@")) {
+            return "text-sky-400"
+          }
+
+          if (token.startsWith('"') || token.startsWith("'")) {
+            return "text-emerald-400"
+          }
+
+          return "text-amber-300"
+        },
+      }
+    case "dotenv":
+      return {
+        pattern: /(#[^\n]*|^[A-Z0-9_]+(?==)|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|<[^>\n]+>)/gim,
+        className: (token) => {
+          if (token.startsWith("#")) {
+            return "text-muted-foreground"
+          }
+
+          if (token.startsWith('"') || token.startsWith("'") || token.startsWith("<")) {
+            return "text-emerald-400"
+          }
+
+          return "text-sky-400"
+        },
+      }
+    case "typescript":
+      return {
+        pattern:
+          /(\/\/[^\n]*|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|`(?:\\.|[^`])*`|\b(?:import|from|const|new|return|if|else|await|async|type|interface)\b|\b(?:true|false|null|undefined)\b|process\.env\.[A-Z0-9_]+|\b(?:Mortem|OpenAI|Anthropic|Connection|ChatOpenAI)\b)/g,
+        className: (token) => {
+          if (token.startsWith("//")) {
+            return "text-muted-foreground"
+          }
+
+          if (token.startsWith('"') || token.startsWith("'") || token.startsWith("`")) {
+            return "text-emerald-400"
+          }
+
+          if (token.startsWith("process.env.")) {
+            return "text-sky-400"
+          }
+
+          if (/^(Mortem|OpenAI|Anthropic|Connection|ChatOpenAI)$/.test(token)) {
+            return "text-violet-300"
+          }
+
+          if (/^(true|false|null|undefined)$/.test(token)) {
+            return "text-orange-300"
+          }
+
+          return "text-amber-300"
+        },
+      }
+    case "text":
+      return {
+        pattern:
+          /(`[^`\n]+`|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|^[A-Z0-9_]+(?==)|\b(?:npm install|pnpm add|Mortem|OpenAI|Anthropic|Vercel AI SDK|LangChain)\b)/gim,
+        className: (token) => {
+          if (token.startsWith("`")) {
+            return "text-sky-400"
+          }
+
+          if (token.startsWith('"') || token.startsWith("'")) {
+            return "text-emerald-400"
+          }
+
+          if (/^[A-Z0-9_]+$/.test(token)) {
+            return "text-sky-400"
+          }
+
+          return "text-amber-300"
+        },
+      }
+  }
 }
 
 function getIntegrationExample(tab: IntegrationTab): Readonly<{ code: string; label: string }> {
