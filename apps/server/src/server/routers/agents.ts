@@ -17,12 +17,32 @@ const agentAccessWhere = (agentId: string, userId: string) => ({
 })
 
 const createApiKey = (): string => `mtm_${randomBytes(32).toString("base64url")}`
+const createVerifyToken = (): string => `mrt_verify_${randomBytes(4).toString("hex")}`
 const AgentDisplayNameSchema = z.string().min(1).regex(/^\S+$/u, "Agent name cannot contain spaces")
+
+const agentListSelect = {
+  createdAt: true,
+  displayName: true,
+  environment: true,
+  id: true,
+  privateMode: true,
+  retentionDays: true,
+  verified: true,
+  verifiedAt: true,
+} as const
+
+const agentDetailSelect = {
+  ...agentListSelect,
+  agentWallet: true,
+  apiKeyHash: true,
+  ownerId: true,
+} as const
 
 export const agentsRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) =>
     prisma.agent.findMany({
       orderBy: { createdAt: "desc" },
+      select: agentListSelect,
       where: {
         OR: [{ ownerId: ctx.userId }, { agentOwners: { some: { userId: ctx.userId } } }],
       },
@@ -31,6 +51,7 @@ export const agentsRouter = createTRPCRouter({
 
   get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) =>
     prisma.agent.findFirst({
+      select: agentDetailSelect,
       where: agentAccessWhere(input.id, ctx.userId),
     }),
   ),
@@ -38,25 +59,27 @@ export const agentsRouter = createTRPCRouter({
   checkConnection: protectedProcedure
     .input(z.object({ agentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const agent = await prisma.agent.findFirst({
-        select: { id: true },
-        where: agentAccessWhere(input.agentId, ctx.userId),
-      })
+      const [agent, firstTrace] = await Promise.all([
+        prisma.agent.findFirst({
+          select: { id: true, verified: true },
+          where: agentAccessWhere(input.agentId, ctx.userId),
+        }),
+        prisma.trace.findFirst({
+          orderBy: { startedAt: "asc" },
+          select: { id: true, startedAt: true },
+          where: { agentId: input.agentId },
+        }),
+      ])
 
       if (agent === null) {
         throw new TRPCError({ code: "NOT_FOUND" })
       }
 
-      const firstTrace = await prisma.trace.findFirst({
-        orderBy: { startedAt: "asc" },
-        select: { id: true, startedAt: true },
-        where: { agentId: input.agentId },
-      })
-
       return {
         connected: firstTrace !== null,
         firstSeenAt: firstTrace?.startedAt ?? null,
         firstTraceId: firstTrace?.id ?? null,
+        verified: agent.verified,
       }
     }),
 
@@ -73,6 +96,7 @@ export const agentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const apiKey = createApiKey()
       const agentId = ulid()
+      const verifyToken = createVerifyToken()
 
       await prisma.user.upsert({
         create: { id: ctx.userId },
@@ -89,6 +113,7 @@ export const agentsRouter = createTRPCRouter({
           ownerId: ctx.userId,
           privateMode: input.privateMode,
           retentionDays: input.retentionDays,
+          verifyToken,
           agentOwners: {
             create: {
               role: "owner",
@@ -101,7 +126,20 @@ export const agentsRouter = createTRPCRouter({
         await addWalletToWebhook(input.agentWallet)
       }
 
-      return { agent, apiKey }
+      return {
+        agent: {
+          createdAt: agent.createdAt,
+          displayName: agent.displayName,
+          environment: agent.environment,
+          id: agent.id,
+          privateMode: agent.privateMode,
+          retentionDays: agent.retentionDays,
+          verified: agent.verified,
+          verifiedAt: agent.verifiedAt,
+        },
+        apiKey,
+        verifyToken,
+      }
     }),
 
   rotateKey: protectedProcedure
@@ -122,7 +160,19 @@ export const agentsRouter = createTRPCRouter({
         where: { id: input.id },
       })
 
-      return { agent, apiKey }
+      return {
+        agent: {
+          createdAt: agent.createdAt,
+          displayName: agent.displayName,
+          environment: agent.environment,
+          id: agent.id,
+          privateMode: agent.privateMode,
+          retentionDays: agent.retentionDays,
+          verified: agent.verified,
+          verifiedAt: agent.verifiedAt,
+        },
+        apiKey,
+      }
     }),
 
   delete: protectedProcedure
