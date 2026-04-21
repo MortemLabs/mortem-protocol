@@ -53,6 +53,7 @@ export const TraceEventTransportSchema = z.object({
 })
 
 export const TraceBatchSchema = z.object({
+  agentId: z.string().optional(),
   batchId: z.string(),
   items: z
     .array(
@@ -62,6 +63,7 @@ export const TraceBatchSchema = z.object({
       }),
     )
     .min(1),
+  verifyToken: z.string().optional(),
 })
 
 export type TraceBatchInput = z.infer<typeof TraceBatchSchema>

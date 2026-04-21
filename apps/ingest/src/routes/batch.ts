@@ -93,6 +93,47 @@ const publishFirstTraceSignal = async (
   )
 }
 
+const verifyAgentOwnership = async (
+  redis: RedisLike,
+  batch: TraceBatchInput,
+  resolvedAgentId: string,
+): Promise<void> => {
+  if (
+    batch.verifyToken === undefined ||
+    batch.agentId === undefined ||
+    batch.agentId !== resolvedAgentId
+  ) {
+    return
+  }
+
+  const agent = await prisma.agent.findFirst({
+    where: {
+      id: batch.agentId,
+      verifyToken: batch.verifyToken,
+      verified: false,
+    },
+  })
+
+  if (agent === null) {
+    return
+  }
+
+  await prisma.agent.update({
+    data: {
+      verified: true,
+      verifiedAt: new Date(),
+    },
+    where: { id: agent.id },
+  })
+
+  await redis.publish(
+    "agent:verified",
+    JSON.stringify({
+      agentId: agent.id,
+    }),
+  )
+}
+
 const validationError = (reply: FastifyReply): FastifyReply =>
   reply.code(400).send({ error: "Invalid trace batch" })
 
@@ -124,6 +165,7 @@ export const registerBatchRoutes = (server: FastifyInstance): void => {
     await persistBatch(parsed.data, agentId)
     await publishSideEffects(redis, parsed.data, agentId)
     await publishFirstTraceSignal(redis, parsed.data, agentId)
+    await verifyAgentOwnership(redis, parsed.data, agentId)
 
     return reply.code(202).send({ traceId: parsed.data.items[0]?.trace.id })
   })
