@@ -73,10 +73,13 @@ const createAnthropicClient = async (): Promise<LLMClient> => {
 }
 
 const createOllamaClient = async (): Promise<LLMClient> => {
-  const modelId = process.env.OLLAMA_MODEL ?? "qwen2.5:72b"
+  const modelId = process.env.OLLAMA_MODEL!
   const { Ollama } = await import("ollama")
   const client = new Ollama({
-    host: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
+    host: "https://ollama.com",
+    headers: {
+      Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
+    },
   })
 
   return {
@@ -102,5 +105,22 @@ const createOllamaClient = async (): Promise<LLMClient> => {
   }
 }
 
-export const getLLMClient = async (): Promise<LLMClient> =>
-  providerFromEnv() === "anthropic" ? createAnthropicClient() : createOllamaClient()
+async function validateOllamaConfig(): Promise<void> {
+  if (process.env.LLM_PROVIDER !== "ollama") return
+
+  if (!process.env.OLLAMA_API_KEY) {
+    throw new Error(
+      "OLLAMA_API_KEY is required when LLM_PROVIDER=ollama.\n" +
+      "Get one at https://ollama.com/settings/keys"
+    )
+  }
+
+  if (!process.env.OLLAMA_MODEL) {
+    throw new Error("OLLAMA_MODEL is required when LLM_PROVIDER=ollama")
+  }
+}
+
+export const getLLMClient = async (): Promise<LLMClient> => {
+  await validateOllamaConfig()
+  return providerFromEnv() === "anthropic" ? createAnthropicClient() : createOllamaClient()
+}
