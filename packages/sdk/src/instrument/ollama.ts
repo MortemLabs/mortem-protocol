@@ -1,5 +1,5 @@
-// Ollama instrumentation patches ollama.chat structurally and treats all local model costs as zero.
-// It captures JSON-mode requests and streams by tapping AsyncGenerator chunks as they pass through.
+// Ollama instrumentation patches ollama.chat structurally. Cloud API costs are billed externally
+// via ollama.com. It captures JSON-mode requests and streams by tapping AsyncGenerator chunks.
 import type { JsonValue, LLMCallPayload, TokenUsage } from "@mortemlabs/shared"
 import { getActiveSession } from "../context.js"
 
@@ -129,7 +129,7 @@ const buildInputPayload = (params: unknown): LLMCallPayload => {
       messages,
       parameters,
     },
-    costUsd: 0,
+    costUsd: -1,  // billed via ollama.com
     streamed: booleanFromRecord(record, "stream") ?? false,
   }
 }

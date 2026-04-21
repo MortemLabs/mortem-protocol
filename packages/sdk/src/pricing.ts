@@ -1,5 +1,5 @@
-// Pricing centralizes model cost estimates for SDK instrumentation and analysis. Local Ollama
-// models always cost zero regardless of model name.
+// Pricing centralizes model cost estimates for SDK instrumentation and analysis. Ollama cloud API
+// usage is billed externally — we return a -1 sentinel so the dashboard can show "usage tracked by Ollama".
 import type { LLMProvider, TokenUsage } from "@mortemlabs/shared"
 
 export type PricingProvider = LLMProvider | "openai" | "unknown" | "vercel-ai"
@@ -44,6 +44,11 @@ export const getModelPricing = (provider: PricingProvider, model: string): Model
 }
 
 export const estimateLLMCostUsd = ({ provider, model, usage }: EstimateCostInput): number => {
+  // Ollama cloud API usage is billed externally — return -1 sentinel
+  if (provider === "ollama" || model.startsWith("ollama/")) {
+    return -1
+  }
+
   if (usage === undefined) {
     return 0
   }
