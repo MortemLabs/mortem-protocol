@@ -21,6 +21,7 @@ const previewAgents = [
     id: "01JPREVIEWTRADER",
     privateMode: false,
     retentionDays: 30,
+    verified: true,
   },
   {
     createdAt: new Date("2026-04-19T00:00:00.000Z"),
@@ -29,12 +30,13 @@ const previewAgents = [
     id: "01JPREVIEWX402",
     privateMode: true,
     retentionDays: 14,
+    verified: false,
   },
 ] satisfies PreviewAgent[]
 
 type PreviewAgent = Pick<
   Agent,
-  "createdAt" | "displayName" | "environment" | "id" | "privateMode" | "retentionDays"
+  "createdAt" | "displayName" | "environment" | "id" | "privateMode" | "retentionDays" | "verified"
 >
 
 export function AgentList() {
@@ -144,25 +146,38 @@ function AgentListFrame({
 
       <div className="divide-y divide-border">
         {agents.map((agent) => (
-          <Link
+          <div
             key={agent.id}
-            href={`/app/agents/${agent.id}`}
-            className="grid min-h-24 gap-3 p-4 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:grid-cols-[minmax(0,1fr)_160px_160px]"
+            className="grid min-h-24 gap-3 p-4 transition-colors hover:bg-accent md:grid-cols-[minmax(0,1fr)_160px_160px]"
           >
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-medium tracking-normal">{agent.displayName}</h3>
+                <Link
+                  href={`/app/agents/${agent.id}`}
+                  className="font-medium tracking-normal hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {agent.displayName}
+                </Link>
                 <Badge variant={agent.privateMode ? "secondary" : "outline"}>
                   {agent.privateMode ? "private" : "shared"}
                 </Badge>
+                {!agent.verified ? <Badge variant="warning">Unverified</Badge> : null}
               </div>
               <p className="mt-2 font-mono text-xs tabular-nums text-muted-foreground">
                 {agent.id}
               </p>
+              {!agent.verified ? (
+                <Link
+                  href={`/app/agents/new?agentId=${agent.id}`}
+                  className="mt-2 inline-flex text-sm font-medium text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
+                >
+                  Complete setup -&gt;
+                </Link>
+              ) : null}
             </div>
             <Metric label="Network" value={agent.environment} />
             <Metric label="Retention" value={`${agent.retentionDays} days`} />
-          </Link>
+          </div>
         ))}
       </div>
     </section>

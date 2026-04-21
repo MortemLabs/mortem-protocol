@@ -23,6 +23,7 @@ export function AgentDetail({ agentId }: Readonly<{ agentId: string }>) {
           id: agentId,
           privateMode: false,
           retentionDays: 30,
+          verified: false,
         }}
         mode="preview"
       />
@@ -91,6 +92,7 @@ function AgentDetailFrame({
     id: string
     privateMode: boolean
     retentionDays: number
+    verified: boolean
   }
   mode: "preview" | "private"
 }>) {
@@ -113,11 +115,20 @@ function AgentDetailFrame({
                   <Badge variant={agent.privateMode ? "secondary" : "outline"}>
                     {agent.privateMode ? "private" : "shared"}
                   </Badge>
+                  {!agent.verified ? <Badge variant="warning">Unverified</Badge> : null}
                   {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
                 </div>
                 <p className="mt-3 font-mono text-xs tabular-nums text-muted-foreground">
                   {agent.id}
                 </p>
+                {!agent.verified ? (
+                  <Link
+                    href={`/app/agents/new?agentId=${agent.id}`}
+                    className="mt-3 inline-flex text-sm font-medium text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
+                  >
+                    Complete setup -&gt;
+                  </Link>
+                ) : null}
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button asChild variant="secondary">
