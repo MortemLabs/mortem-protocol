@@ -1,5 +1,6 @@
 // The app home route is the authenticated workspace entry point and starts with the user's agents.
 // Data fetching lives in the client child so Privy JWTs can be attached to tRPC requests.
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { AgentList } from "./agent-list"
 
@@ -15,6 +16,9 @@ export default function AppHomePage() {
             Mortem
           </Link>
           <nav className="flex items-center gap-2 text-sm" aria-label="Workspace">
+            <Button asChild>
+              <Link href="/app/agents/new">Add agent</Link>
+            </Button>
             <Link
               href="/login"
               className="inline-flex min-h-10 items-center rounded-md px-3 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
