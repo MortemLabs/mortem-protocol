@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 // returned at creation or rotation time; the database stores SHA-256 hashes.
 import prisma from "@mortemlabs/db"
 import { sha256 } from "@mortemlabs/shared"
+import { TRPCError } from "@trpc/server"
 import { ulid } from "ulid"
 import { z } from "zod"
 import { addWalletToWebhook, removeWalletFromWebhook } from "../../lib/helius"
@@ -16,10 +17,7 @@ const agentAccessWhere = (agentId: string, userId: string) => ({
 })
 
 const createApiKey = (): string => `mtm_${randomBytes(32).toString("base64url")}`
-const AgentDisplayNameSchema = z
-  .string()
-  .min(1)
-  .regex(/^\S+$/u, "Agent name cannot contain spaces")
+const AgentDisplayNameSchema = z.string().min(1).regex(/^\S+$/u, "Agent name cannot contain spaces")
 
 export const agentsRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) =>
@@ -36,6 +34,31 @@ export const agentsRouter = createTRPCRouter({
       where: agentAccessWhere(input.id, ctx.userId),
     }),
   ),
+
+  checkConnection: protectedProcedure
+    .input(z.object({ agentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const agent = await prisma.agent.findFirst({
+        select: { id: true },
+        where: agentAccessWhere(input.agentId, ctx.userId),
+      })
+
+      if (agent === null) {
+        throw new TRPCError({ code: "NOT_FOUND" })
+      }
+
+      const firstTrace = await prisma.trace.findFirst({
+        orderBy: { startedAt: "asc" },
+        select: { id: true, startedAt: true },
+        where: { agentId: input.agentId },
+      })
+
+      return {
+        connected: firstTrace !== null,
+        firstSeenAt: firstTrace?.startedAt ?? null,
+        firstTraceId: firstTrace?.id ?? null,
+      }
+    }),
 
   create: protectedProcedure
     .input(
