@@ -1122,6 +1122,10 @@ function formatUsd(value: string): string {
     return value
   }
 
+  if (numeric < 0) {
+    return "tracked by Ollama"
+  }
+
   return `$${numeric.toFixed(6)}`
 }
 

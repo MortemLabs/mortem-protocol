@@ -200,7 +200,7 @@ export const LLMCallPayloadSchema: z.ZodType<LLMCallPayload> = z.object({
     })
     .optional(),
   usage: TokenUsageSchema.optional(),
-  costUsd: z.number().nonnegative(),
+  costUsd: z.number().min(-1),
   streamed: z.boolean(),
 })
 

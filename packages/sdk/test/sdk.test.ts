@@ -114,7 +114,7 @@ describe("Mortem SDK wrappers", () => {
     expect(payload.provider).toBe("anthropic")
   })
 
-  it("captures Ollama chats with zero cost", async () => {
+  it("captures Ollama chats with externally billed cost", async () => {
     const events = await collectEvents(async (mortem) => {
       const ollama = mortem.wrapOllama({
         chat: async () => ({
@@ -130,7 +130,7 @@ describe("Mortem SDK wrappers", () => {
     const payload = eventPayload(requireEvent(events, "llm_call"))
 
     expect(payload.provider).toBe("ollama")
-    expect(payload.costUsd).toBe(0)
+    expect(payload.costUsd).toBe(-1)
   })
 
   it("captures Vercel AI tools and language models", async () => {
