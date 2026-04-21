@@ -170,7 +170,8 @@ LLM_PROVIDER=ollama
 LLM_PROVIDER=anthropic
 ```
 
-Ollama is the default for local development. Anthropic requires `ANTHROPIC_API_KEY`.
+Ollama is the default and uses the hosted cloud API — no local installation needed. Set
+`OLLAMA_API_KEY` and `OLLAMA_MODEL`. Anthropic requires `ANTHROPIC_API_KEY`.
 
 ### Memo Anchoring
 
@@ -207,7 +208,7 @@ Install these before running the full stack:
 - Upstash Redis REST credentials for production-like queues
 - Privy app credentials
 - Helius API key for devnet RPC and transaction enrichment
-- Ollama locally or an Anthropic API key for analysis
+- Ollama cloud API key (https://ollama.com/settings/keys) or an Anthropic API key for analysis
 - Solana CLI if you want to fund a local memo signer wallet
 
 ## Environment Setup
@@ -474,7 +475,7 @@ If analysis never appears:
 ```text
 Run the analysis worker.
 Check analysis:pending in Redis.
-For Ollama, make sure OLLAMA_BASE_URL has no /v1 suffix.
+For Ollama, make sure OLLAMA_API_KEY is set. Get one at https://ollama.com/settings/keys.
 For Anthropic, make sure ANTHROPIC_API_KEY is set.
 ```
 
