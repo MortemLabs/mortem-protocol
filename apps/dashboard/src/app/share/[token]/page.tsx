@@ -100,7 +100,7 @@ export default async function SharePage({
                 }
               />
               <ReadonlyRow
-                label="On-chain root"
+                label="Memo root"
                 value={
                   "onChainRootMatched" in data.verification && data.verification.onChainRootMatched
                     ? "matched"

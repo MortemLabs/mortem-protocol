@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
-import { Activity, AlertCircle, Database, Plus, RefreshCcw, ShieldCheck } from "lucide-react"
+import { Activity, AlertCircle, Database, Plus, RefreshCcw } from "lucide-react"
 import Link from "next/link"
 import type { AppRouter } from "../../../../server/src/server/root"
 
@@ -20,7 +20,6 @@ const previewAgents = [
     environment: "devnet",
     id: "01JPREVIEWTRADER",
     privateMode: false,
-    registryPda: "9xQe...mT9v",
     retentionDays: 30,
   },
   {
@@ -29,20 +28,13 @@ const previewAgents = [
     environment: "devnet",
     id: "01JPREVIEWX402",
     privateMode: true,
-    registryPda: null,
     retentionDays: 14,
   },
 ] satisfies PreviewAgent[]
 
 type PreviewAgent = Pick<
   Agent,
-  | "createdAt"
-  | "displayName"
-  | "environment"
-  | "id"
-  | "privateMode"
-  | "registryPda"
-  | "retentionDays"
+  "createdAt" | "displayName" | "environment" | "id" | "privateMode" | "retentionDays"
 >
 
 export function AgentList() {
@@ -141,16 +133,10 @@ function AgentListFrame({
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button asChild variant="secondary">
-            <Link href="/app/onchain">
-              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-              On-chain
-            </Link>
-          </Button>
           <Button asChild>
             <Link href="/app/agents/new">
               <Plus className="h-4 w-4" aria-hidden="true" />
-              New agent
+              Add agent
             </Link>
           </Button>
         </div>
@@ -192,12 +178,12 @@ function EmptyAgentList() {
       <h2 className="mt-5 text-xl font-semibold tracking-normal">No agents yet.</h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
         Create an agent to receive an API key, start sessions from the SDK, and anchor completed
-        traces to Solana.
+        traces with Solana memo transactions.
       </p>
       <Button asChild className="mt-6">
         <Link href="/app/agents/new">
           <Plus className="h-4 w-4" aria-hidden="true" />
-          New agent
+          Add agent
         </Link>
       </Button>
     </section>

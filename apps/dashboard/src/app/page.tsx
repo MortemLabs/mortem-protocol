@@ -33,8 +33,8 @@ export default function LandingPage() {
               Debug the exact moment an agent drifts.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-              Trace LLM calls, tools, Solana transactions, x402 payments, and on-chain proofs in one
-              timeline built for production TypeScript agents.
+              Trace LLM calls, tools, Solana transactions, x402 payments, and memo-backed proofs in
+              one timeline built for production TypeScript agents.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
@@ -48,13 +48,13 @@ export default function LandingPage() {
 
           <div className="border border-border bg-card p-4 text-card-foreground shadow-sm">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <span className="text-sm font-medium">Live anchor queue</span>
+              <span className="text-sm font-medium">Live memo queue</span>
               <span className="font-mono text-xs tabular-nums text-muted-foreground">devnet</span>
             </div>
             <div className="space-y-4 pt-4">
               {[
                 ["trace_01H", "LLM retry avoided", "completed"],
-                ["trace_01J", "PDA funding required", "waiting"],
+                ["trace_01J", "Memo signer retry pending", "waiting"],
                 ["trace_01K", "Merkle proof ready", "anchored"],
               ].map(([trace, detail, status]) => (
                 <div

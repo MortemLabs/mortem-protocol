@@ -111,9 +111,9 @@ const previewTrace: TraceDetailView = {
         verdict: "avoidable",
       },
       {
-        answer: "The PDA funding issue would still need a user top-up before anchoring.",
-        evidence: "The user registry balance was below the configured reserve.",
-        question: "Could the backend have committed without funding?",
+        answer: "The memo signer wallet still needed more SOL before the batch could land.",
+        evidence: "The signer balance was below what the retry loop needed for transaction fees.",
+        question: "Could the backend have committed without topping up the signer?",
         verdict: "unavoidable",
       },
     ],
@@ -406,7 +406,7 @@ function TraceMetadataPanel({
       <section className="border-b border-border p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-normal">
           <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-          Anchor status
+          Memo anchor status
         </h2>
         <AnchorVerifier trace={trace} />
       </section>
@@ -664,7 +664,7 @@ function AnchorVerifier({ trace }: Readonly<{ trace: TraceDetailView }>) {
     kind: "idle",
     message:
       trace.anchorSignature === null
-        ? "Waiting for an AnchorBatch commit."
+        ? "Waiting for a memo anchor transaction."
         : "Ready to check the local proof.",
   })
   const [verifying, setVerifying] = useState(false)
@@ -927,7 +927,7 @@ function parseCounterfactuals(value: unknown): CounterfactualView[] {
 
 async function verifyTraceAnchor(trace: TraceDetailView): Promise<VerificationState> {
   if (trace.anchorSignature === null) {
-    return { kind: "unavailable", message: "This trace has not landed in an AnchorBatch yet." }
+    return { kind: "unavailable", message: "This trace has not landed in a memo anchor yet." }
   }
 
   if (trace.traceHash === null) {
@@ -940,7 +940,7 @@ async function verifyTraceAnchor(trace: TraceDetailView): Promise<VerificationSt
   }
 
   if (trace.merkleRoot === null) {
-    return { kind: "unavailable", message: "Anchor batch root has not been indexed yet." }
+    return { kind: "unavailable", message: "Memo root has not been indexed yet." }
   }
 
   const verified = await verifyMerkleProofInBrowser(trace.traceHash, proof, trace.merkleRoot)
@@ -949,19 +949,19 @@ async function verifyTraceAnchor(trace: TraceDetailView): Promise<VerificationSt
     return {
       computedRoot: trace.merkleRoot,
       kind: "verified",
-      message: "Merkle proof verified against the AnchorBatch root.",
+      message: "Merkle proof verified against the memo transaction root.",
     }
   }
 
   if (proof.length === 0) {
-    return { kind: "invalid", message: "Singleton proof did not match the AnchorBatch root." }
+    return { kind: "invalid", message: "Singleton proof did not match the memo transaction root." }
   }
 
   const computedRoot = await computeRootFromProof(trace.traceHash, proof)
   return {
     computedRoot,
     kind: "invalid",
-    message: "Merkle proof recomputed locally but did not match the AnchorBatch root.",
+    message: "Merkle proof recomputed locally but did not match the memo transaction root.",
   }
 }
 

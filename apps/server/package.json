@@ -23,7 +23,6 @@
     "@upstash/redis": "^1.35.5",
     "next": "15.3.2",
     "ollama": "^0.5.17",
-    "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "superjson": "^2.2.2",
@@ -31,7 +30,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/qrcode": "^1.5.5",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.4",
     "vitest": "^1.6.1"

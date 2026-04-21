@@ -31,11 +31,11 @@ const previewTraces = [
     durationMs: null,
     eventCount: 7,
     id: "01JTRACEPREVIEWB",
-    inputSummary: "PDA funding check before anchor commit.",
+    inputSummary: "Memo commit retry after signer fee exhaustion.",
     solanaTxCount: 0,
     startedAt: new Date("2026-04-19T10:14:00.000Z"),
     status: "errored",
-    tags: ["anchor"],
+    tags: ["memo-anchor"],
     totalTokens: 980,
   },
 ] satisfies PreviewTrace[]

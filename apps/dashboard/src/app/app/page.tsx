@@ -16,12 +16,6 @@ export default function AppHomePage() {
           </Link>
           <nav className="flex items-center gap-2 text-sm" aria-label="Workspace">
             <Link
-              href="/app/onchain"
-              className="inline-flex min-h-10 items-center rounded-md px-3 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              On-chain
-            </Link>
-            <Link
               href="/login"
               className="inline-flex min-h-10 items-center rounded-md px-3 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
@@ -37,7 +31,7 @@ export default function AppHomePage() {
               <h1 className="mt-2 text-3xl font-semibold tracking-normal">Agents</h1>
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              Monitor trace volume, anchor state, and live debugging posture for every TypeScript
+              Monitor trace volume, memo anchoring, and live debugging posture for every TypeScript
               agent sending events to Mortem.
             </p>
           </aside>

@@ -86,7 +86,6 @@ export const UserSchema: z.ZodType<User> = z.object({
   id: z.string(),
   email: z.string().nullable(),
   primaryWallet: z.string().nullable(),
-  userPda: z.string().nullable(),
   pdaFunded: z.boolean(),
   plan: UserPlanSchema,
   createdAt: z.date(),
@@ -101,8 +100,6 @@ export const AgentSchema: z.ZodType<Agent> = z.object({
   environment: AgentEnvironmentSchema,
   privateMode: z.boolean(),
   retentionDays: z.number().int().nonnegative(),
-  registryPda: z.string().nullable(),
-  userPda: z.string().nullable(),
   createdAt: z.date(),
 })
 

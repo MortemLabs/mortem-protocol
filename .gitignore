@@ -12,4 +12,4 @@ target/
 *.log
 *.tsbuildinfo
 .DS_Store
-anchor-wallet.json
+mortem-signer.json

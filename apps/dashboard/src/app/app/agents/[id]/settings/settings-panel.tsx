@@ -31,9 +31,7 @@ type AgentSettingsView = {
   environment: string
   id: string
   privateMode: boolean
-  registryPda: string | null
   retentionDays: number
-  userPda: string | null
 }
 
 const previewAgent: AgentSettingsView = {
@@ -42,9 +40,7 @@ const previewAgent: AgentSettingsView = {
   environment: "devnet",
   id: "01JAGENTPREVIEW",
   privateMode: false,
-  registryPda: "9xQeWvG816bUx9EPf7hP7v5R5R4VMY7nGmT9v",
   retentionDays: 30,
-  userPda: "6WmMZKkR3T3Zd2QEqQeU2w3Z7u1N7dt5Sc9m6vbPda1",
 }
 
 export function AgentSettings({ agentId }: Readonly<{ agentId: string }>) {
@@ -230,8 +226,8 @@ function AgentSettingsFrame({
               This agent keeps trace payloads for {agent.retentionDays} days before policy cleanup.
             </p>
             <div className="mt-5 space-y-3">
-              <ReadonlyRow label="Registry PDA" value={agent.registryPda ?? "not registered"} />
-              <ReadonlyRow label="User PDA" value={agent.userPda ?? "not registered"} />
+              <ReadonlyRow label="Anchoring mode" value="Solana memo transaction" />
+              <ReadonlyRow label="Signing flow" value="Backend signer pays the tx fee" />
             </div>
           </aside>
         </section>
@@ -387,9 +383,7 @@ function toAgentSettingsView(agent: AgentOutput): AgentSettingsView {
     environment: agent.environment,
     id: agent.id,
     privateMode: agent.privateMode,
-    registryPda: agent.registryPda,
     retentionDays: agent.retentionDays,
-    userPda: agent.userPda,
   }
 }
 

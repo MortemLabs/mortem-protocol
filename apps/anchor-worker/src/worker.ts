@@ -1,28 +1,26 @@
-// Worker logic turns queued trace IDs into ordered Merkle batches per agent. On-chain transaction
-// submission is intentionally separate so PDA wiring can land in its own commit.
+// Worker logic turns queued trace IDs into ordered Merkle batches per agent. Solana memo
+// submission is intentionally separate so batching stays testable without an RPC dependency.
 import prisma from "@mortemlabs/db"
 import { getMerkleProof, getMerkleRoot } from "@mortemlabs/shared"
+import { commitPreparedBatch } from "./commit.js"
 import { getAnchorWorkerEnv } from "./env.js"
-import { commitPreparedBatch } from "./onchain.js"
 import { type RedisLike, getRedis } from "./redis.js"
 
-export interface PreparedAnchorBatch {
+export interface PreparedMemoBatch {
   agentId: string
-  agentPda: string
   merkleRoot: string
   proofs: Array<{
     merkleProof: string
     traceId: string
   }>
   traceCount: number
-  userPda: string
 }
 
 const unique = (values: readonly string[]): string[] => [...new Set(values)]
 
 export const preparePendingBatches = async (
   traceIds: readonly string[],
-): Promise<PreparedAnchorBatch[]> => {
+): Promise<PreparedMemoBatch[]> => {
   const env = getAnchorWorkerEnv()
   const ids = unique(traceIds).slice(0, env.maxBatchSize)
 
@@ -33,12 +31,6 @@ export const preparePendingBatches = async (
   const traces = await prisma.trace.findMany({
     orderBy: { startedAt: "asc" },
     select: {
-      agent: {
-        select: {
-          registryPda: true,
-          userPda: true,
-        },
-      },
       agentId: true,
       id: true,
       traceHash: true,
@@ -51,28 +43,20 @@ export const preparePendingBatches = async (
   const grouped = new Map<
     string,
     Array<{
-      agentPda: string
       hash: string
       id: string
-      userPda: string
     }>
   >()
 
   for (const trace of traces) {
-    if (
-      trace.traceHash === null ||
-      trace.agent.userPda === null ||
-      trace.agent.registryPda === null
-    ) {
+    if (trace.traceHash === null) {
       continue
     }
 
     const existing = grouped.get(trace.agentId) ?? []
     existing.push({
-      agentPda: trace.agent.registryPda,
       hash: trace.traceHash,
       id: trace.id,
-      userPda: trace.agent.userPda,
     })
     grouped.set(trace.agentId, existing)
   }
@@ -82,21 +66,19 @@ export const preparePendingBatches = async (
 
     return {
       agentId,
-      agentPda: agentTraces[0]?.agentPda ?? "",
       merkleRoot: getMerkleRoot(hashes),
       proofs: agentTraces.map((trace, index) => ({
         merkleProof: JSON.stringify(getMerkleProof(hashes, index)),
         traceId: trace.id,
       })),
       traceCount: agentTraces.length,
-      userPda: agentTraces[0]?.userPda ?? "",
     }
   })
 }
 
 export const runAnchorWorkerOnce = async (
   redis: RedisLike = getRedis(),
-): Promise<PreparedAnchorBatch[]> => {
+): Promise<PreparedMemoBatch[]> => {
   const pending = await redis.lrange<string>("anchor:pending", 0, -1)
   const batches = await preparePendingBatches(pending)
 

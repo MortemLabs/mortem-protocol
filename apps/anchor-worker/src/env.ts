@@ -1,5 +1,5 @@
-// Anchor worker environment parsing keeps queue cadence and RPC configuration centralized. Defaults
-// are devnet-friendly and safe for local dry runs.
+// Anchor worker environment parsing keeps queue cadence and memo-commit RPC configuration
+// centralized. Defaults are devnet-friendly and safe for local dry runs.
 const readInteger = (name: string, fallback: number): number => {
   const value = process.env[name]
 
@@ -19,7 +19,7 @@ export const getAnchorWorkerEnv = () => ({
       : `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`),
   intervalMs: readInteger("ANCHOR_WORKER_INTERVAL_MS", 60_000),
   maxBatchSize: readInteger("ANCHOR_WORKER_MAX_BATCH_SIZE", 100),
-  programId: process.env.MORTEM_PROGRAM_ID,
+  signerSecretKey: process.env.MORTEM_SIGNER_SECRET_KEY,
   redisToken: process.env.REDIS_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN,
   redisUrl: process.env.REDIS_URL ?? process.env.UPSTASH_REDIS_REST_URL,
 })

@@ -13,7 +13,6 @@ model User {
   id            String       @id
   email         String?
   primaryWallet String?
-  userPda       String?
   pdaFunded     Boolean      @default(false)
   plan          String       @default("free")
   createdAt     DateTime     @default(now())
@@ -31,8 +30,6 @@ model Agent {
   environment   String
   privateMode   Boolean      @default(false)
   retentionDays Int          @default(30)
-  registryPda   String?
-  userPda       String?
   createdAt     DateTime     @default(now())
   traces        Trace[]
   agentOwners   AgentOwner[]

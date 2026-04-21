@@ -7,7 +7,7 @@ those traces in Postgres, streams them live to a dashboard, analyzes failures wi
 anchor trace batches on Solana with Merkle roots.
 
 The project is a pnpm monorepo powered by Turborepo, strict TypeScript, Prisma, Fastify, Next.js,
-Privy, Upstash Redis, and Anchor.
+Privy, Upstash Redis, and Solana memo transactions for anchoring.
 
 ## What Mortem Does
 
@@ -29,7 +29,7 @@ TypeScript agent
   -> Postgres traces and events
   -> dashboard, live stream, analysis worker
   -> anchor worker
-  -> Solana Anchor program
+  -> Solana memo transaction
 ```
 
 ## Repository Structure
@@ -46,9 +46,6 @@ TypeScript agent
 │   ├── shared             Shared types, Zod schemas, canonical JSON, hashing, Merkle utilities
 │   ├── db                 Prisma schema, migrations, and Prisma client singleton
 │   └── sdk                Public TypeScript SDK and instrumentation wrappers
-├── programs
-│   └── mortem             Anchor program for user, agent, and batch registry PDAs
-├── Anchor.toml            Anchor workspace config
 ├── turbo.json             Turborepo task graph
 ├── biome.json             Biome lint and format config
 └── pnpm-workspace.yaml    pnpm workspace package layout
@@ -101,7 +98,6 @@ Routers:
 - `agents`: list, get, create, rotate API key, delete
 - `traces`: list, get, share, unshare, delete
 - `analysis`: get and rerun trace analysis
-- `onchain`: PDA info, QR funding, unsigned registration transactions, anchor history
 - `verify`: public trace lookup by share token
 
 Privy is frontend-only for login. The browser sends a Privy JWT with tRPC calls, and the server only
@@ -120,8 +116,8 @@ Routes:
 /app/agents/[id]          Agent detail and live stream
 /app/agents/[id]/traces   Trace list
 /app/agents/[id]/settings Agent settings and API keys
+/app/agents/new           Agent onboarding wizard
 /app/traces/[id]          Trace detail
-/app/onchain              PDA registration, funding, and anchor history
 /share/[token]            Public shared trace
 ```
 
@@ -176,30 +172,30 @@ LLM_PROVIDER=anthropic
 
 Ollama is the default for local development. Anthropic requires `ANTHROPIC_API_KEY`.
 
-### On-Chain Program
+### Memo Anchoring
 
-`programs/mortem` is an Anchor program on Solana devnet.
-
-It stores:
-
-- `UserRegistry` PDA for each user wallet
-- `AgentRegistry` PDA nested under a user registry
-- `AnchorBatch` PDA for each committed Merkle batch
+Mortem now anchors Merkle roots with the native Solana Memo program instead of a custom on-chain
+program.
 
 The verification chain is:
 
 ```text
-wallet
-  -> UserRegistry PDA
-  -> AgentRegistry PDA
-  -> AnchorBatch PDA
-  -> Merkle root
+memo transaction
+  -> JSON memo payload
+  -> merkleRoot
   -> Merkle proof
   -> trace hash
 ```
 
-Users register and fund their PDA from the dashboard. The backend wallet only signs `commit_batch`.
-It does not sign user registration transactions.
+Each memo payload includes:
+
+- `agentId`
+- `batchIndex`
+- `merkleRoot`
+- `traceCount`
+- `ts`
+
+Anyone can inspect the memo transaction in Explorer and recompute the proof locally.
 
 ## Prerequisites
 
@@ -212,7 +208,7 @@ Install these before running the full stack:
 - Privy app credentials
 - Helius API key for devnet RPC and transaction enrichment
 - Ollama locally or an Anthropic API key for analysis
-- Rust, Solana CLI, and Anchor 0.30.1 for on-chain development
+- Solana CLI if you want to fund a local memo signer wallet
 
 ## Environment Setup
 
@@ -331,7 +327,7 @@ That is useful once your shell has the shared environment loaded.
 5. Use that key in an instrumented TypeScript agent.
 6. Open the agent detail page to watch live traces.
 7. Open a trace detail page to inspect events, analysis, sharing, and verification state.
-8. Use `/app/onchain` to register and fund PDAs for Solana anchoring.
+8. Use the onboarding flow at `/app/agents/new` for the fastest first-run setup.
 
 ## Using The SDK
 
@@ -388,32 +384,22 @@ const connection = mortem.wrapConnection(solanaConnection)
 The SDK is designed to be best effort. Buffer flush errors are swallowed and reported through the
 optional logger instead of interrupting the agent.
 
-## On-Chain Anchoring
+## Memo Anchoring
 
-The on-chain flow has three parts:
+The anchoring flow has three parts:
 
-1. The user registers a `UserRegistry` PDA from the dashboard.
-2. The user funds that PDA with SOL using the generated Solana Pay QR code.
-3. The anchor worker commits Merkle roots for completed trace batches.
+1. The worker groups completed trace hashes by agent.
+2. It computes a Merkle root and stores per-trace proofs in Postgres.
+3. It submits one Solana memo transaction containing the batch metadata.
 
-The dashboard builds unsigned registration transactions through the server. The user signs them in
-Phantom or another Solana wallet. The backend committer wallet is only used for `commit_batch`.
-
-Useful local commands:
+If you need a devnet signer wallet:
 
 ```bash
-anchor build
-anchor test
-```
-
-If you need a devnet committer wallet:
-
-```bash
-solana-keygen new --outfile anchor-wallet.json
+solana-keygen new --outfile mortem-signer.json
 solana airdrop 1 <pubkey> --url devnet
 ```
 
-Put the base58-encoded secret key in `ANCHOR_WALLET_SECRET_KEY`.
+Put the base58-encoded secret key in `MORTEM_SIGNER_SECRET_KEY`.
 
 ## Common Scripts
 
@@ -445,18 +431,11 @@ The repo has unit and integration-style coverage across the main packages:
 - SDK buffering and instrumentation behavior
 - ingest routes
 - workers
-- Anchor bankrun tests
 
 Run everything:
 
 ```bash
 corepack pnpm test
-```
-
-Run the Anchor tests:
-
-```bash
-anchor test
 ```
 
 ## Production Notes
@@ -503,10 +482,10 @@ If anchoring does not happen:
 
 ```text
 Run the anchor worker.
-Confirm MORTEM_PROGRAM_ID and HELIUS_RPC_URL.
-Confirm the user and agent are registered on chain.
-Confirm the UserRegistry PDA has enough lamports.
-FundingRequired means the batch was skipped and left pending.
+Confirm HELIUS_RPC_URL.
+Confirm MORTEM_SIGNER_SECRET_KEY is funded and valid.
+Confirm the memo signer wallet has enough lamports for transaction fees.
+Check the stored anchorSignature on the trace and inspect the memo in Explorer.
 ```
 
 ## License

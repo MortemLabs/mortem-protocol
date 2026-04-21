@@ -22,7 +22,6 @@ export function AgentDetail({ agentId }: Readonly<{ agentId: string }>) {
           environment: "devnet",
           id: agentId,
           privateMode: false,
-          registryPda: "9xQe...mT9v",
           retentionDays: 30,
         }}
         mode="preview"
@@ -91,7 +90,6 @@ function AgentDetailFrame({
     environment: string
     id: string
     privateMode: boolean
-    registryPda: string | null
     retentionDays: number
   }
   mode: "preview" | "private"
@@ -140,10 +138,7 @@ function AgentDetailFrame({
             <div className="mt-8 grid gap-3 md:grid-cols-3">
               <Stat label="Network" value={agent.environment} />
               <Stat label="Retention" value={`${agent.retentionDays} days`} />
-              <Stat
-                label="Registry PDA"
-                value={agent.registryPda === null ? "not registered" : agent.registryPda}
-              />
+              <Stat label="Anchoring" value="memo tx" />
             </div>
           </div>
 

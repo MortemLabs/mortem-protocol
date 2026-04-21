@@ -2,7 +2,7 @@
   "name": "@mortemlabs/dashboard",
   "version": "0.0.0",
   "private": true,
-  "description": "Mortem observability dashboard for agents, traces, and on-chain anchoring.",
+  "description": "Mortem observability dashboard for agents, traces, and memo anchoring.",
   "type": "module",
   "scripts": {
     "build": "next build",
@@ -20,7 +20,6 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@solana/web3.js": "^1.95.8",
     "@tanstack/react-query": "^5.90.10",
     "@trpc/client": "11.0.0",
     "@trpc/react-query": "11.0.0",

@@ -34,7 +34,6 @@ export interface User {
   id: string
   email: string | null
   primaryWallet: string | null
-  userPda: string | null
   pdaFunded: boolean
   plan: UserPlan
   createdAt: Date
@@ -49,8 +48,6 @@ export interface Agent {
   environment: AgentEnvironment
   privateMode: boolean
   retentionDays: number
-  registryPda: string | null
-  userPda: string | null
   createdAt: Date
 }
 
