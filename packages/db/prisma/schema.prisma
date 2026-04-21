@@ -27,6 +27,9 @@ model Agent {
   agentWallet   String?
   displayName   String
   apiKeyHash    String       @unique
+  verifyToken   String       @unique
+  verified      Boolean      @default(false)
+  verifiedAt    DateTime?
   environment   String
   privateMode   Boolean      @default(false)
   retentionDays Int          @default(30)
