@@ -42,6 +42,7 @@ const previewConnection = {
   connected: true,
   firstSeenAt: new Date("2026-04-21T09:30:00.000Z"),
   firstTraceId: "01JPREVIEWTRACE0001",
+  verified: true,
 }
 const integrationTabs: Array<{ label: string; value: IntegrationTab }> = [
   { label: "OpenAI", value: "openai" },
@@ -91,6 +92,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
     mode === "preview" ? previewAgent : null,
   )
   const [localError, setLocalError] = useState<string | null>(null)
+  const [timedOut, setTimedOut] = useState(false)
   const connectionPollRef = useRef<number | null>(null)
   const connectionCheck = trpc.agents.checkConnection.useQuery(
     { agentId: createdAgent?.id ?? previewAgent.id },
@@ -111,6 +113,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
       })
       setCurrentStep(2)
       setLocalError(null)
+      setTimedOut(false)
       await utils.agents.list.invalidate()
     },
   })
@@ -136,6 +139,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const assistantPrompt = createdAgent === null ? null : getAssistantPrompt(createdAgent)
   const connectionState = mode === "preview" ? previewConnection : connectionCheck.data
   const isConnected = connectionState?.connected === true
+  const isVerified = connectionState?.verified === true
+  const isWaitingForVerification = isConnected && !isVerified
   const createdAgentId = createdAgent?.id ?? null
   const refetchConnection = connectionCheck.refetch
 
@@ -176,6 +181,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
       })
       setCurrentStep(2)
       setLocalError(null)
+      setTimedOut(false)
       return
     }
 
@@ -423,7 +429,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
             </WizardStep>
 
             <WizardStep
-              description="Run the agent once and Mortem will look for the first trace."
+              description="Run the agent once and Mortem will wait for both the first trace and the verify token proof."
               number={4}
               state={stepFourState}
               title="Listening for your agent…"
@@ -433,26 +439,48 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               ) : (
                 <div className="space-y-5">
                   <div className="flex items-start gap-3 rounded-md border border-border bg-background p-4">
-                    {isConnected ? (
+                    {isVerified ? (
                       <CheckCircle2
                         className="mt-0.5 h-5 w-5 text-emerald-600"
                         aria-hidden="true"
                       />
+                    ) : timedOut ? (
+                      <span
+                        className="mt-1 h-3 w-3 rounded-full bg-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    ) : isWaitingForVerification ? (
+                      <span
+                        className="mt-1 h-3 w-3 animate-pulse rounded-full bg-amber-500"
+                        aria-hidden="true"
+                      />
                     ) : (
                       <span
-                        className="mt-1 h-3 w-3 rounded-full bg-primary animate-pulse"
+                        className="mt-1 h-3 w-3 animate-pulse rounded-full bg-primary"
                         aria-hidden="true"
                       />
                     )}
 
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        {isConnected
-                          ? "Agent connected! First trace received."
-                          : "Waiting for first trace"}
+                        {isVerified
+                          ? "Agent verified and connected."
+                          : timedOut
+                            ? isConnected
+                              ? "Verification did not complete after 4 minutes."
+                              : "No connection detected after 4 minutes."
+                            : isWaitingForVerification
+                              ? "Agent reached Mortem - waiting for verify token..."
+                              : "Waiting for first trace"}
                       </p>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        Run your agent once to verify the connection.
+                        {isVerified
+                          ? "Mortem matched the verify token and the connection is now trusted."
+                          : timedOut
+                            ? "Use the checklist below, then retry the polling step when you are ready."
+                            : isWaitingForVerification
+                              ? "Make sure MORTEM_VERIFY_TOKEN is set in your env and run your agent again."
+                              : "Run your agent once so Mortem can receive a trace and verify the token."}
                       </p>
                     </div>
                   </div>
@@ -464,10 +492,10 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     </div>
                   )}
 
-                  {isConnected ? (
+                  {isVerified ? (
                     <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4">
                       <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                        Agent connected! First trace received.
+                        Agent verified and connected.
                       </p>
                       {connectionState?.firstSeenAt === null ||
                       connectionState?.firstSeenAt === undefined ? null : (
@@ -475,12 +503,15 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                           First seen {formatDateTime(connectionState.firstSeenAt)}.
                         </p>
                       )}
+                      <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-200">
+                        You can remove <code>MORTEM_VERIFY_TOKEN</code> from your code now.
+                      </p>
                       <div className="mt-4 flex flex-wrap gap-3">
                         {connectionState?.firstTraceId === null ||
                         connectionState?.firstTraceId === undefined ? null : (
                           <Button asChild>
                             <Link href={`/app/traces/${connectionState.firstTraceId}`}>
-                              View trace
+                              View first trace -&gt;
                             </Link>
                           </Button>
                         )}
