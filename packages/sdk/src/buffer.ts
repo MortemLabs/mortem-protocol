@@ -2,9 +2,10 @@
 // into agent code. Failed flushes are warned about and dropped after bounded retries.
 import { gzipSync } from "node:zlib"
 import { ulid } from "ulid"
-import type { BufferBatchItem, MortemLogger } from "./types.js"
+import type { BufferBatchItem, MortemLogger, TransportBatchPayload } from "./types.js"
 
 export interface MortemBufferOptions {
+  agentId?: string | undefined
   ingestUrl: string
   apiKey: string
   enabled: boolean
@@ -12,6 +13,7 @@ export interface MortemBufferOptions {
   maxBufferBytes: number
   fetchImpl?: typeof fetch | undefined
   logger?: MortemLogger | undefined
+  verifyToken?: string | undefined
 }
 
 const MAX_RETRIES = 3
@@ -34,6 +36,7 @@ export class MortemBuffer {
   private queuedBytes = 0
   private flushing = false
   private timer: ReturnType<typeof setInterval> | undefined
+  private verifyTokenSent = false
 
   constructor(options: MortemBufferOptions) {
     this.options = options
@@ -99,11 +102,22 @@ export class MortemBuffer {
       return
     }
 
-    const payload = stringifyForTransport({
+    const payload: TransportBatchPayload = {
       batchId: ulid(),
       items: batch,
-    })
-    const body = gzipSync(Buffer.from(payload, "utf8"))
+    }
+
+    if (
+      !this.verifyTokenSent &&
+      (this.options.verifyToken?.length ?? 0) > 0 &&
+      (this.options.agentId?.length ?? 0) > 0
+    ) {
+      payload.agentId = this.options.agentId
+      payload.verifyToken = this.options.verifyToken
+      this.verifyTokenSent = true
+    }
+
+    const body = gzipSync(Buffer.from(stringifyForTransport(payload), "utf8"))
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
       const sent = await this.sendOnce(fetchImpl, body)

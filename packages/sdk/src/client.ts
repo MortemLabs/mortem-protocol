@@ -31,11 +31,12 @@ const warn = (logger: MortemLogger | undefined, message: string): void => {
 
 interface ResolvedMortemConfig {
   apiKey: string
+  agentId?: string | undefined
   enabled: boolean
   flushIntervalMs: number
   ingestUrl: string
   maxBufferBytes: number
-  agentId?: string | undefined
+  verifyToken?: string | undefined
   environment?: MortemConfig["environment"] | undefined
   fetch?: typeof fetch | undefined
   logger?: MortemLogger | undefined
@@ -56,8 +57,10 @@ export class Mortem {
       ingestUrl: config.ingestUrl ?? DEFAULT_INGEST_URL,
       logger: config.logger,
       maxBufferBytes: config.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES,
+      verifyToken: config.verifyToken,
     }
     this.buffer = new MortemBuffer({
+      agentId: this.config.agentId,
       apiKey: this.config.apiKey,
       enabled: this.config.enabled && this.config.apiKey.length > 0,
       fetchImpl: this.config.fetch,
@@ -65,10 +68,15 @@ export class Mortem {
       ingestUrl: this.config.ingestUrl,
       logger: this.config.logger,
       maxBufferBytes: this.config.maxBufferBytes,
+      verifyToken: this.config.verifyToken,
     })
 
     if (this.config.apiKey.length === 0) {
       warn(this.config.logger, "Mortem SDK disabled because apiKey is empty")
+    }
+
+    if ((this.config.verifyToken?.length ?? 0) > 0 && (this.config.agentId?.length ?? 0) === 0) {
+      warn(this.config.logger, "Mortem verifyToken ignored because agentId is missing")
     }
   }
 

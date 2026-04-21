@@ -17,6 +17,7 @@ export interface MortemConfig {
   apiKey: string
   ingestUrl?: string | undefined
   agentId?: string | undefined
+  verifyToken?: string | undefined
   environment?: AgentEnvironment | undefined
   enabled?: boolean | undefined
   flushIntervalMs?: number | undefined
@@ -53,6 +54,13 @@ export interface FailEventOptions {
 export interface BufferBatchItem {
   trace: Trace
   events: TraceEvent[]
+}
+
+export interface TransportBatchPayload {
+  agentId?: string | undefined
+  batchId: string
+  items: BufferBatchItem[]
+  verifyToken?: string | undefined
 }
 
 export interface SessionRuntimeConfig {

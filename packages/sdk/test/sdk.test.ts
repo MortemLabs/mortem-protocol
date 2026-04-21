@@ -14,7 +14,9 @@ interface CapturedItem {
 }
 
 interface CapturedBatch {
+  agentId?: string
   items: CapturedItem[]
+  verifyToken?: string
 }
 
 interface HandlerLike {
@@ -179,6 +181,49 @@ describe("Mortem SDK wrappers", () => {
 })
 
 describe("Mortem SDK buffer", () => {
+  it("sends the verify token only on the first flush", async () => {
+    const bodies: Buffer[] = []
+    const fetchMock: typeof fetch = async (_input, init) => {
+      const body = init?.body
+
+      if (body instanceof Uint8Array) {
+        bodies.push(Buffer.from(body))
+      }
+
+      return new Response(null, { status: 202 })
+    }
+    const mortem = new Mortem({
+      agentId: "agent_01",
+      apiKey: "test_api_key",
+      fetch: fetchMock,
+      flushIntervalMs: 60_000,
+      ingestUrl: "https://ingest.test",
+      verifyToken: "mrt_verify_a3f9c2d1",
+    })
+
+    const firstSession = await mortem.startSession({ inputSummary: "first run" })
+    const firstEvent = firstSession.beginEvent("custom", { name: "first", data: null })
+    firstEvent.complete()
+    await firstSession.complete()
+    await mortem.flush()
+
+    const secondSession = await mortem.startSession({ inputSummary: "second run" })
+    const secondEvent = secondSession.beginEvent("custom", { name: "second", data: null })
+    secondEvent.complete()
+    await secondSession.complete()
+    await mortem.close()
+
+    expect(bodies).toHaveLength(2)
+
+    const firstBatch = parseBatch(bodies[0] as Buffer)
+    const secondBatch = parseBatch(bodies[1] as Buffer)
+
+    expect(firstBatch.agentId).toBe("agent_01")
+    expect(firstBatch.verifyToken).toBe("mrt_verify_a3f9c2d1")
+    expect(secondBatch.agentId).toBeUndefined()
+    expect(secondBatch.verifyToken).toBeUndefined()
+  })
+
   it("does not propagate ingest failures", async () => {
     const fetchMock: typeof fetch = async () => {
       throw new Error("network down")
