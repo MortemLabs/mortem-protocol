@@ -48,8 +48,8 @@ function PrivyLoginPanel() {
       </h1>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
         {authenticated
-          ? `${email} can open private agents, live streams, and on-chain PDA controls.`
-          : "Privy opens a secure modal and returns a JWT that every tRPC request sends to Mortem."}
+          ? `${email} can open private agents and live streams`
+          : "login to Mortem."}
       </p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         {authenticated ? (
@@ -63,7 +63,7 @@ function PrivyLoginPanel() {
           </>
         ) : (
           <Button type="button" disabled={!ready} onClick={() => login()}>
-            {ready ? "Sign in with Privy" : "Preparing sign in"}
+            {ready ? "Sign in" : "Preparing sign in"}
           </Button>
         )}
       </div>
