@@ -496,7 +496,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       language="typescript"
                       value={integrationExample.code}
                     />
-                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-black dark:text-black">
                       The verify token proves you control this agent. You can remove it from your
                       code after Mortem confirms the connection.
                     </div>
@@ -811,11 +811,11 @@ function CodeBlock({
   value,
 }: Readonly<{ label: string; language?: CodeLanguage; value: string }>) {
   return (
-    <div className="rounded-md border border-border bg-background">
-      <div className="border-b border-border px-4 py-3">
-        <p className="text-sm font-medium text-foreground">{label}</p>
+    <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
+      <div className="border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-3">
+        <p className="text-sm font-medium text-zinc-200">{label}</p>
       </div>
-      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">
+      <pre className="overflow-x-auto bg-zinc-900 px-4 py-4 text-sm leading-7 text-zinc-100">
         <code>{renderHighlightedCode(value, language)}</code>
       </pre>
     </div>
@@ -841,15 +841,19 @@ function CopyBlock({
   }
 
   return (
-    <div className="rounded-md border border-border bg-background">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <p className="text-sm font-medium text-foreground">{label}</p>
+    <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-3">
+        <p className="text-sm font-medium text-zinc-200">{label}</p>
         <Button
           type="button"
           variant={copied ? "secondary" : "outline"}
           size="sm"
           onClick={() => void copy()}
-          className={cn(copied && "border-emerald-600/30 text-emerald-700 dark:text-emerald-300")}
+          className={cn(
+            "border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 hover:text-zinc-50",
+            copied &&
+              "border-emerald-500/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
+          )}
         >
           {copied ? (
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
@@ -859,7 +863,7 @@ function CopyBlock({
           {copied ? "Copied" : copyLabel}
         </Button>
       </div>
-      <pre className="overflow-x-auto px-4 py-4 text-sm leading-7 text-foreground">
+      <pre className="overflow-x-auto bg-zinc-900 px-4 py-4 text-sm leading-7 text-zinc-100">
         <code>{renderHighlightedCode(value, language)}</code>
       </pre>
     </div>
@@ -983,14 +987,14 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith("@")) {
-            return "text-sky-400"
+            return "text-sky-300"
           }
 
           if (token.startsWith('"') || token.startsWith("'")) {
-            return "text-emerald-400"
+            return "text-emerald-300"
           }
 
-          return "text-amber-300"
+          return "text-amber-200"
         },
       }
     case "dotenv":
@@ -1002,10 +1006,10 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'") || token.startsWith("<")) {
-            return "text-emerald-400"
+            return "text-emerald-300"
           }
 
-          return "text-sky-400"
+          return "text-sky-300"
         },
       }
     case "typescript":
@@ -1018,22 +1022,22 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'") || token.startsWith("`")) {
-            return "text-emerald-400"
+            return "text-emerald-300"
           }
 
           if (token.startsWith("process.env.")) {
-            return "text-sky-400"
+            return "text-sky-300"
           }
 
           if (/^(Mortem|OpenAI|Anthropic|Connection|ChatOpenAI)$/.test(token)) {
-            return "text-violet-300"
+            return "text-violet-200"
           }
 
           if (/^(true|false|null|undefined)$/.test(token)) {
-            return "text-orange-300"
+            return "text-orange-200"
           }
 
-          return "text-amber-300"
+          return "text-amber-200"
         },
       }
     case "text":
@@ -1042,18 +1046,18 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           /(`[^`\n]+`|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|^[A-Z0-9_]+(?==)|\b(?:npm install|pnpm add|Mortem|OpenAI|Anthropic|Vercel AI SDK|LangChain)\b)/gim,
         className: (token) => {
           if (token.startsWith("`")) {
-            return "text-sky-400"
+            return "text-sky-300"
           }
 
           if (token.startsWith('"') || token.startsWith("'")) {
-            return "text-emerald-400"
+            return "text-emerald-300"
           }
 
           if (/^[A-Z0-9_]+$/.test(token)) {
-            return "text-sky-400"
+            return "text-sky-300"
           }
 
-          return "text-amber-300"
+          return "text-amber-200"
         },
       }
   }
