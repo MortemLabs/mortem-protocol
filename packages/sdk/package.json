@@ -1,16 +1,22 @@
 {
   "name": "@mortemlabs/sdk",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.1",
   "description": "Mortem TypeScript SDK for AI agent observability.",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "dist/**/*.js"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
