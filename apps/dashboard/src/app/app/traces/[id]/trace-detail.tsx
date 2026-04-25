@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Copy,
+  ExternalLink,
   GitBranch,
   KeyRound,
   Loader2,
@@ -398,7 +399,7 @@ function TraceMetadataPanel({
         <TraceStat label="Duration" value={formatDuration(trace.durationMs)} />
         <TraceStat label="Events" value={String(trace.eventCount)} />
         <TraceStat label="Tokens" value={String(trace.totalTokens)} />
-        <TraceStat label="Cost" value={formatUsd(trace.totalCostUsd)} />
+        <TraceStat label="Cost" value={formatCost(trace.totalCostUsd)} />
         <TraceStat label="Lamports" value={trace.totalLamports} />
         <TraceStat label="Txs" value={String(trace.solanaTxCount)} />
       </div>
@@ -813,7 +814,7 @@ function CopyButton({ label, value }: Readonly<{ label: string; value: string }>
   )
 }
 
-function TraceStat({ label, value }: Readonly<{ label: string; value: string }>) {
+function TraceStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <div className="bg-card p-3">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -1116,14 +1117,24 @@ function formatDuration(value: number | null): string {
   return `${(value / 1000).toFixed(2)}s`
 }
 
-function formatUsd(value: string): string {
+function formatCost(value: string): ReactNode {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) {
     return value
   }
 
   if (numeric < 0) {
-    return "tracked by Ollama"
+    return (
+      <Link
+        className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
+        href="https://ollama.com/settings/usage"
+        target="_blank"
+        rel="noreferrer"
+      >
+        usage tracked by Ollama
+        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+      </Link>
+    )
   }
 
   return `$${numeric.toFixed(6)}`

@@ -73,7 +73,7 @@ const createAnthropicClient = async (): Promise<LLMClient> => {
 }
 
 const createOllamaClient = async (): Promise<LLMClient> => {
-  const modelId = process.env.OLLAMA_MODEL!
+  const modelId = process.env.OLLAMA_MODEL ?? ""
   const { Ollama } = await import("ollama")
   const client = new Ollama({
     host: "https://ollama.com",
@@ -111,7 +111,7 @@ async function validateOllamaConfig(): Promise<void> {
   if (!process.env.OLLAMA_API_KEY) {
     throw new Error(
       "OLLAMA_API_KEY is required when LLM_PROVIDER=ollama.\n" +
-      "Get one at https://ollama.com/settings/keys"
+        "Get one at https://ollama.com/settings/keys",
     )
   }
 

@@ -129,7 +129,7 @@ const buildInputPayload = (params: unknown): LLMCallPayload => {
       messages,
       parameters,
     },
-    costUsd: -1,  // billed via ollama.com
+    costUsd: -1, // billed via ollama.com
     streamed: booleanFromRecord(record, "stream") ?? false,
   }
 }

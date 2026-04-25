@@ -6,6 +6,7 @@ import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
 import type { inferRouterOutputs } from "@trpc/server"
 import { AlertCircle, ArrowLeft, ExternalLink, ShieldCheck } from "lucide-react"
 import Link from "next/link"
+import type { ReactNode } from "react"
 import superjson from "superjson"
 import type { AppRouter } from "../../../../../server/src/server/root"
 
@@ -71,7 +72,7 @@ export default async function SharePage({
           <div className="mt-6 grid gap-3 md:grid-cols-4">
             <ShareStat label="Events" value={String(data.trace.eventCount)} />
             <ShareStat label="Tokens" value={String(data.trace.totalTokens)} />
-            <ShareStat label="Cost" value={formatUsd(data.trace.totalCostUsd.toString())} />
+            <ShareStat label="Cost" value={formatCost(data.trace.totalCostUsd.toString())} />
             <ShareStat label="Solana txs" value={String(data.trace.solanaTxCount)} />
           </div>
         </section>
@@ -214,7 +215,7 @@ function SharedEventRow({ event }: Readonly<{ event: SharedEvent }>) {
   )
 }
 
-function ShareStat({ label, value }: Readonly<{ label: string; value: string }>) {
+function ShareStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <div className="rounded-md border border-border bg-background p-3">
       <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
@@ -277,14 +278,24 @@ function formatDuration(value: number | null): string {
   return `${(value / 1000).toFixed(2)}s`
 }
 
-function formatUsd(value: string): string {
+function formatCost(value: string): ReactNode {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) {
     return value
   }
 
   if (numeric < 0) {
-    return "tracked by Ollama"
+    return (
+      <Link
+        className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
+        href="https://ollama.com/settings/usage"
+        target="_blank"
+        rel="noreferrer"
+      >
+        usage tracked by Ollama
+        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+      </Link>
+    )
   }
 
   return `$${numeric.toFixed(6)}`
