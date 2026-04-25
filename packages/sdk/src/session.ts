@@ -89,6 +89,10 @@ export class Session implements EventSink {
     this.config.buffer.enqueue({ trace: this.snapshot(), events: [] })
   }
 
+  get traceId(): string {
+    return this.id
+  }
+
   beginEvent(
     type: EventType,
     payload: JsonValue = null,

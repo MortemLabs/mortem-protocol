@@ -181,6 +181,19 @@ describe("Mortem SDK wrappers", () => {
 })
 
 describe("Mortem SDK buffer", () => {
+  it("exposes traceId as an alias for the session id", async () => {
+    const mortem = new Mortem({
+      agentId: "agent_01",
+      apiKey: "test_api_key",
+      flushIntervalMs: 60_000,
+      ingestUrl: "https://ingest.test",
+    })
+    const session = await mortem.startSession({ inputSummary: "test run" })
+
+    expect(session.traceId).toBe(session.id)
+    await mortem.close()
+  })
+
   it("sends the verify token only on the first flush", async () => {
     const bodies: Buffer[] = []
     const fetchMock: typeof fetch = async (_input, init) => {
