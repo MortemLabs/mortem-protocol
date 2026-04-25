@@ -48,9 +48,8 @@ const previewConnection = {
 }
 const POLL_INTERVAL_MS = 4_000
 const POLL_TIMEOUT_MS = 4 * 60 * 1_000
-const ingestBatchUrl = `${
-  process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
-}/v1/traces/batch`
+const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
+const ingestBatchUrl = `${ingestUrl}/v1/traces/batch`
 const integrationTabs: Array<{ label: string; value: IntegrationTab }> = [
   { label: "OpenAI", value: "openai" },
   { label: "Anthropic", value: "anthropic" },
@@ -421,7 +420,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                   <CopyBlock
                     label="Environment variables"
                     language="dotenv"
-                    value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}`}
+                    value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}\nMORTEM_INGEST_URL=${ingestUrl}`}
                   />
                   {hasVerifyCredentials ? null : (
                     <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
@@ -1064,7 +1063,7 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
 }
 
 function getIntegrationExample(tab: IntegrationTab): Readonly<{ code: string; label: string }> {
-  const baseConfig = `import { Mortem } from "@mortemlabs/sdk"\n\nconst mortem = new Mortem({\n  apiKey: process.env.MORTEM_API_KEY!,\n  agentId: process.env.MORTEM_AGENT_ID!,\n  verifyToken: process.env.MORTEM_VERIFY_TOKEN, // remove after verified\n})`
+  const baseConfig = `import { Mortem } from "@mortemlabs/sdk"\n\nconst mortem = new Mortem({\n  apiKey: process.env.MORTEM_API_KEY!,\n  agentId: process.env.MORTEM_AGENT_ID!,\n  verifyToken: process.env.MORTEM_VERIFY_TOKEN, // remove after verified\n  ingestUrl: process.env.MORTEM_INGEST_URL,\n})`
 
   switch (tab) {
     case "openai":
@@ -1102,6 +1101,7 @@ Use these env vars:
 MORTEM_API_KEY="${apiKey}"
 MORTEM_AGENT_ID="${createdAgent.id}"
 MORTEM_VERIFY_TOKEN="${verifyToken}"
+MORTEM_INGEST_URL="${ingestUrl}"
 
 Add to your agent's entry point:
 
@@ -1110,6 +1110,7 @@ const mortem = new Mortem({
   apiKey: process.env.MORTEM_API_KEY!,
   agentId: process.env.MORTEM_AGENT_ID!,
   verifyToken: process.env.MORTEM_VERIFY_TOKEN,
+  ingestUrl: process.env.MORTEM_INGEST_URL,
 })
 
 Then:
