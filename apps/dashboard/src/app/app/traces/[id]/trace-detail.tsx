@@ -23,7 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { AppRouter } from "../../../../../../server/src/server/root"
 
 type TraceOutput = NonNullable<inferRouterOutputs<AppRouter>["traces"]["get"]>
