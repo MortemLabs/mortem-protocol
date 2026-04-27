@@ -1,6 +1,6 @@
 {
   "name": "@mortemlabs/sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Mortem TypeScript SDK for AI agent observability.",
   "type": "module",
   "publishConfig": {
