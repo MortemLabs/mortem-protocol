@@ -1,16 +1,16 @@
 // Public share pages render trace evidence on the server so links remain readable without browser
-// JavaScript. Data is loaded through the public tRPC verify router instead of protected dashboard APIs.
+// JavaScript. Data is loaded through a public trace read instead of protected dashboard APIs.
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
 import type { inferRouterOutputs } from "@trpc/server"
-import { AlertCircle, ArrowLeft, ExternalLink, ShieldCheck } from "lucide-react"
+import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import superjson from "superjson"
 import type { AppRouter } from "../../../../../server/src/server/root"
 
-type ShareResult = inferRouterOutputs<AppRouter>["verify"]["byShareToken"]
+type ShareResult = inferRouterOutputs<AppRouter>["traces"]["byShareToken"]
 type SharedTrace = NonNullable<ShareResult>
 type SharedEvent = SharedTrace["events"][number]
 
@@ -51,101 +51,41 @@ export default async function SharePage({
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={statusVariant(data.trace.status)}>{data.trace.status}</Badge>
-                <Badge variant={data.verification.anchored ? "success" : "warning"}>
-                  {data.verification.anchored ? "anchored" : "not anchored"}
-                </Badge>
+                <Badge variant={statusVariant(data.status)}>{data.status}</Badge>
               </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-normal">
-                {data.trace.inputSummary}
-              </h1>
-              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
-                {data.trace.id}
-              </p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-normal">{data.inputSummary}</h1>
+              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{data.id}</p>
             </div>
             <div className="rounded-md border border-border bg-background p-3">
               <p className="text-xs font-medium text-muted-foreground">Started</p>
-              <p className="mt-1 font-mono text-xs">{formatDate(data.trace.startedAt)}</p>
+              <p className="mt-1 font-mono text-xs">{formatDate(data.startedAt)}</p>
             </div>
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-4">
-            <ShareStat label="Events" value={String(data.trace.eventCount)} />
-            <ShareStat label="Tokens" value={String(data.trace.totalTokens)} />
-            <ShareStat label="Cost" value={formatCost(data.trace.totalCostUsd.toString())} />
-            <ShareStat label="Solana txs" value={String(data.trace.solanaTxCount)} />
+            <ShareStat label="Events" value={String(data.eventCount)} />
+            <ShareStat label="Tokens" value={String(data.totalTokens)} />
+            <ShareStat label="Cost" value={formatCost(data.totalCostUsd.toString())} />
+            <ShareStat label="Solana txs" value={String(data.solanaTxCount)} />
           </div>
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="border border-border bg-card p-5 text-card-foreground shadow-sm">
-            <h2 className="flex items-center gap-2 text-xl font-semibold tracking-normal">
-              <ShieldCheck className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-              Verification
-            </h2>
-            <div className="mt-4 space-y-3">
-              <ReadonlyRow
-                label="Merkle proof"
-                value={data.verification.merkleProofValid ? "valid" : "not verified"}
-              />
-              <ReadonlyRow
-                label="Trace hash"
-                value={"traceHash" in data.verification ? data.verification.traceHash : "missing"}
-              />
-              <ReadonlyRow
-                label="Merkle root"
-                value={
-                  "merkleRoot" in data.verification
-                    ? (data.verification.merkleRoot ?? "missing")
-                    : "missing"
-                }
-              />
-              <ReadonlyRow
-                label="Memo root"
-                value={
-                  "onChainRootMatched" in data.verification && data.verification.onChainRootMatched
-                    ? "matched"
-                    : "not matched"
-                }
-              />
-              <ReadonlyRow
-                label="Anchor slot"
-                value={
-                  "anchorSlot" in data.verification
-                    ? (data.verification.anchorSlot ?? "pending")
-                    : "pending"
-                }
-              />
-              {"anchorSignature" in data.verification &&
-              data.verification.anchorSignature !== null ? (
-                <a
-                  href={`https://explorer.solana.com/tx/${data.verification.anchorSignature}?cluster=devnet`}
-                  className="inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Explorer
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-              ) : null}
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold tracking-normal">AI Analysis</h3>
-              {data.analysis === null ? (
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Analysis has not been written for this trace.
-                </p>
-              ) : (
-                <div className="mt-3 space-y-3 text-sm leading-6">
-                  <Badge variant={failureVariant(data.analysis.failureType)}>
-                    {data.analysis.failureType}
-                  </Badge>
-                  <p>{data.analysis.summary}</p>
-                  <p className="text-muted-foreground">{data.analysis.suggestedFix}</p>
-                </div>
-              )}
-            </div>
+            <h2 className="text-xl font-semibold tracking-normal">AI Analysis</h2>
+            {data.analysis === null ? (
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Analysis has not been written for this trace.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3 text-sm leading-6">
+                <Badge variant={failureVariant(data.analysis.failureType)}>
+                  {data.analysis.failureType}
+                </Badge>
+                <p>{data.analysis.summary}</p>
+                <p className="text-muted-foreground">{data.analysis.suggestedFix}</p>
+              </div>
+            )}
           </aside>
 
           <section className="border border-border bg-card text-card-foreground shadow-sm">
@@ -171,7 +111,7 @@ export default async function SharePage({
 
 async function getSharedTrace(token: string): Promise<ShareResult> {
   try {
-    return await publicClient.verify.byShareToken.query({ token })
+    return await publicClient.traces.byShareToken.query({ token })
   } catch {
     return null
   }
@@ -220,15 +160,6 @@ function ShareStat({ label, value }: Readonly<{ label: string; value: ReactNode 
     <div className="rounded-md border border-border bg-background p-3">
       <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
       <p className="mt-2 break-all font-mono text-sm">{value}</p>
-    </div>
-  )
-}
-
-function ReadonlyRow({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
-      <p className="mt-1 break-all font-mono text-xs">{value}</p>
     </div>
   )
 }
