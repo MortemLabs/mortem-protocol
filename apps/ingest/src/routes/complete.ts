@@ -1,5 +1,5 @@
 // The completion route lets SDKs finalize a trace when the last buffered batch is not enough. It
-// verifies API-key ownership, updates terminal fields, and leaves completed traces queued for workers.
+// verifies API-key ownership, updates terminal fields, and leaves completed traces queued for analysis.
 import prisma, { type Prisma } from "@mortemlabs/db"
 import { TraceStatusSchema } from "@mortemlabs/shared"
 import type { FastifyInstance } from "fastify"
@@ -76,7 +76,6 @@ export const registerCompleteRoutes = (server: FastifyInstance): void => {
     })
 
     if (body.data.status === "completed" || body.data.status === "errored") {
-      await redis.lpush("anchor:pending", params.data.id)
       await redis.lpush("analysis:pending", params.data.id)
     }
 

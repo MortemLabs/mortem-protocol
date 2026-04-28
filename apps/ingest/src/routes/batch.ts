@@ -59,7 +59,6 @@ const publishSideEffects = async (
     await redis.publish(`pubsub:live:${agentId}`, livePayload)
 
     if (item.trace.status === "completed" || item.trace.status === "errored") {
-      await redis.lpush("anchor:pending", item.trace.id)
       await redis.lpush("analysis:pending", item.trace.id)
     }
   }
