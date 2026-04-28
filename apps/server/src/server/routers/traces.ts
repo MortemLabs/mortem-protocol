@@ -1,10 +1,9 @@
-// Trace procedures expose paginated trace browsing, detail reads, public share token controls, and
-// deletion for agents the authenticated Privy user can access.
+// Trace procedures expose paginated trace browsing, detail reads, public share links, and deletion
+// for agents the authenticated Privy user can access.
 import prisma, { type Prisma } from "@mortemlabs/db"
-import { getMerkleRoot } from "@mortemlabs/shared"
 import { ulid } from "ulid"
 import { z } from "zod"
-import { createTRPCRouter, protectedProcedure } from "../trpc"
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc"
 
 const TraceListInputSchema = z.object({
   agentId: z.string(),
@@ -35,30 +34,31 @@ const traceAccessWhere = (traceId: string, userId: string) => ({
   },
 })
 
-const getTraceBatchRoot = async ({
-  agentId,
-  anchorSignature,
-}: {
-  agentId: string
-  anchorSignature: string | null
-}): Promise<string | null> => {
-  if (anchorSignature === null) {
-    return null
-  }
+const traceSummarySelect = {
+  agentId: true,
+  durationMs: true,
+  endedAt: true,
+  errorMessage: true,
+  eventCount: true,
+  id: true,
+  inputSummary: true,
+  outputSummary: true,
+  shareToken: true,
+  solanaTxCount: true,
+  startedAt: true,
+  status: true,
+  tags: true,
+  toolsCalled: true,
+  totalCostUsd: true,
+  totalLamports: true,
+  totalTokens: true,
+} satisfies Prisma.TraceSelect
 
-  const traces = await prisma.trace.findMany({
-    orderBy: { startedAt: "asc" },
-    select: { traceHash: true },
-    where: {
-      agentId,
-      anchorSignature,
-      traceHash: { not: null },
-    },
-  })
-  const hashes = traces.flatMap((trace) => (trace.traceHash === null ? [] : [trace.traceHash]))
-
-  return hashes.length === 0 ? null : getMerkleRoot(hashes)
-}
+const traceDetailSelect = {
+  ...traceSummarySelect,
+  analysis: true,
+  events: { orderBy: { sequence: "asc" } },
+} satisfies Prisma.TraceSelect
 
 export const tracesRouter = createTRPCRouter({
   list: protectedProcedure.input(TraceListInputSchema).query(async ({ ctx, input }) => {
@@ -80,6 +80,7 @@ export const tracesRouter = createTRPCRouter({
 
     const query: Prisma.TraceFindManyArgs = {
       orderBy: { startedAt: "desc" },
+      select: traceSummarySelect,
       take: input.limit + 1,
       where,
     }
@@ -99,25 +100,19 @@ export const tracesRouter = createTRPCRouter({
 
   get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const trace = await prisma.trace.findFirst({
-      include: {
-        analysis: true,
-        events: { orderBy: { sequence: "asc" } },
-      },
+      select: traceDetailSelect,
       where: traceAccessWhere(input.id, ctx.userId),
     })
 
-    if (trace === null) {
-      return null
-    }
-
-    return {
-      ...trace,
-      merkleRoot: await getTraceBatchRoot({
-        agentId: trace.agentId,
-        anchorSignature: trace.anchorSignature,
-      }),
-    }
+    return trace
   }),
+
+  byShareToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) =>
+    prisma.trace.findUnique({
+      select: traceDetailSelect,
+      where: { shareToken: input.token },
+    }),
+  ),
 
   share: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     const existing = await prisma.trace.findFirst({
