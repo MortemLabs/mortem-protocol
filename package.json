@@ -10,14 +10,14 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "build": "turbo run build",
-    "clean": "turbo run clean",
-    "dev": "turbo run dev",
+    "build": "turbo run build --filter=!@mortemlabs/anchor-worker",
+    "clean": "turbo run clean --filter=!@mortemlabs/anchor-worker",
+    "dev": "turbo run dev --filter=!@mortemlabs/anchor-worker",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "test": "turbo run test --filter=!@mortemlabs/anchor-worker",
+    "typecheck": "turbo run typecheck --filter=!@mortemlabs/anchor-worker"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
