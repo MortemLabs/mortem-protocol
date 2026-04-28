@@ -3,11 +3,10 @@
 Mortem is an observability and debugging platform for TypeScript AI agents running on Solana.
 
 It captures agent traces, LLM calls, tool calls, Solana transactions, and custom events. It stores
-those traces in Postgres, streams them live to a dashboard, analyzes failures with an LLM, and can
-anchor trace batches on Solana with Merkle roots.
+those traces in Postgres, streams them live to a dashboard, and analyzes failures with an LLM.
 
 The project is a pnpm monorepo powered by Turborepo, strict TypeScript, Prisma, Fastify, Next.js,
-Privy, Upstash Redis, and Solana memo transactions for anchoring.
+Privy, Upstash Redis, and a preserved-but-decoupled anchor worker for future on-chain experiments.
 
 ## What Mortem Does
 
@@ -18,7 +17,6 @@ Mortem helps answer a few practical questions when an AI agent fails:
 - Which Solana transactions did it send?
 - What market context or tool output was available at the time?
 - Was the failure avoidable?
-- Can this trace be verified against a memo-backed Merkle commitment on Solana?
 
 The core flow is:
 
@@ -28,8 +26,6 @@ TypeScript agent
   -> ingest service
   -> Postgres traces and events
   -> dashboard, live stream, analysis worker
-  -> anchor worker
-  -> Solana memo transaction
 ```
 
 ## Repository Structure
@@ -40,10 +36,10 @@ TypeScript agent
 │   ├── dashboard          Next.js dashboard and public share pages
 │   ├── server             Next.js tRPC API, analysis worker, and Helius webhook helpers
 │   ├── ingest             Fastify trace ingestion and live SSE service
-│   ├── anchor-worker      Worker that commits Merkle trace batches as Solana memo transactions
+│   ├── anchor-worker      Preserved but decoupled worker for future on-chain anchoring
 │   └── enrichment-worker  Helius webhook worker for Solana transaction enrichment
 ├── packages
-│   ├── shared             Shared types, Zod schemas, canonical JSON, hashing, Merkle utilities
+│   ├── shared             Shared types, Zod schemas, canonical JSON, hashing, and utilities
 │   ├── db                 Prisma schema, migrations, and Prisma client singleton
 │   └── sdk                Public TypeScript SDK and instrumentation wrappers
 ├── turbo.json             Turborepo task graph
@@ -82,8 +78,7 @@ GET  /v1/agents/:id/live
 ```
 
 The batch route validates input with Zod, resolves API keys, rate limits by agent, writes traces and
-events through Prisma, pushes live updates to Redis, and queues completed traces for analysis and
-anchoring.
+events through Prisma, pushes live updates to Redis, and queues completed traces for analysis.
 
 ### API Server
 
@@ -96,9 +91,8 @@ http://localhost:3001/api/trpc
 Routers:
 
 - `agents`: list, get, create, rotate API key, check onboarding connection state, delete
-- `traces`: list, get, share, unshare, delete
+- `traces`: list, get, share, unshare, public by-share-token read, delete
 - `analysis`: get and rerun trace analysis
-- `verify`: public trace lookup by share token
 
 Privy is frontend-only for login. The browser sends a Privy JWT with tRPC calls, and the server only
 uses `verifyAuthToken` to verify that JWT.
@@ -125,6 +119,10 @@ Routes:
 ```
 
 The dashboard uses Privy for login, tRPC for application data, and SSE for live trace updates.
+
+Shared trace links remain available through `/share/[token]`, but the public page now shows only the
+trace, events, and analysis. The older cryptographic verification block is no longer part of the
+live product surface.
 
 The primary first-run path is `/app/agents/new`, a four-step onboarding wizard:
 
@@ -184,33 +182,20 @@ LLM_PROVIDER=anthropic
 Ollama is the default and uses the hosted cloud API — no local installation needed. Set
 `OLLAMA_API_KEY` and `OLLAMA_MODEL`. Anthropic requires `ANTHROPIC_API_KEY`.
 
-### Memo Anchoring
+### Anchor Worker
 
-Mortem now anchors Merkle roots with the native Solana Memo program instead of a custom on-chain
-program.
+`apps/anchor-worker` remains in the repository, but it is currently decoupled from ingest, server,
+and dashboard flows.
 
-The verification chain is:
+Today that means:
 
-```text
-memo transaction
-  -> JSON memo payload
-  -> merkleRoot
-  -> Merkle proof
-  -> trace hash
-```
+- ingest does not enqueue traces for anchoring
+- server trace responses do not expose anchor metadata
+- dashboard trace and share pages do not show anchor or verification UI
+- root Turbo scripts exclude `@mortemlabs/anchor-worker`
 
-Each memo payload includes:
-
-- `agentId`
-- `batchIndex`
-- `merkleRoot`
-- `traceCount`
-- `ts`
-
-Anyone can inspect the memo transaction in Explorer and recompute the proof locally.
-
-There is no custom Solana program in this repository. The previous Anchor program and PDA flow were
-replaced entirely by native memo transactions.
+If you want to re-enable anchoring later, see
+[`apps/anchor-worker/ANCHORING.md`](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/ANCHORING.md).
 
 ## Prerequisites
 
@@ -224,7 +209,6 @@ Install these before running the full stack:
 - Helius API key for devnet RPC and transaction enrichment
 - Helius webhook ID if you want Mortem to manage the wallet watchlist automatically
 - Ollama cloud API key (https://ollama.com/settings/keys) or an Anthropic API key for analysis
-- Solana CLI if you want to fund a local memo signer wallet
 
 ## Environment Setup
 
@@ -267,9 +251,11 @@ Never commit `.env`, `.env.local`, private keys, API keys, webhook secrets, or w
 
 Important environment values to set for the current architecture:
 
-- `MORTEM_SIGNER_SECRET_KEY` is the funded signer used by the memo anchoring worker.
 - `HELIUS_WEBHOOK_ID` lets the server add and remove agent wallets from the existing Helius webhook.
 - `OLLAMA_API_KEY` and `OLLAMA_MODEL` are required when `LLM_PROVIDER=ollama`.
+
+If you are experimenting with the decoupled anchor worker manually, it still uses
+`MORTEM_SIGNER_SECRET_KEY`. That variable is not required for the normal app flow.
 
 ## Install
 
@@ -319,7 +305,6 @@ Optional workers:
 
 ```bash
 corepack pnpm --filter @mortemlabs/server worker:analysis
-corepack pnpm --filter @mortemlabs/anchor-worker dev
 corepack pnpm --filter @mortemlabs/enrichment-worker dev
 ```
 
@@ -338,7 +323,7 @@ You can also start every package with Turbo:
 corepack pnpm dev
 ```
 
-That is useful once your shell has the shared environment loaded.
+That starts the shared app pipeline and intentionally excludes `@mortemlabs/anchor-worker`.
 
 ## Using The Dashboard
 
@@ -349,7 +334,7 @@ That is useful once your shell has the shared environment loaded.
 5. Add `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, and the one-time `MORTEM_VERIFY_TOKEN` to your agent.
 6. Run the agent once so the wizard can detect the first trace.
 7. Open the agent detail page to watch live traces.
-8. Open a trace detail page to inspect events, analysis, sharing, memo anchoring, and verification state.
+8. Open a trace detail page to inspect events, analysis, and sharing state.
 
 ## Using The SDK
 
@@ -410,25 +395,14 @@ optional logger instead of interrupting the agent.
 If you use the onboarding wizard, it pre-fills the exact `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, and
 `MORTEM_VERIFY_TOKEN` values for you and keeps polling until the first trace is received.
 
-## Memo Anchoring
+## Anchor Worker
 
-The anchoring flow has three parts:
+The anchor worker is preserved for future use but not connected to the live product flow.
 
-1. The worker groups completed trace hashes by agent.
-2. It computes a Merkle root and stores per-trace proofs in Postgres.
-3. It submits one Solana memo transaction containing the batch metadata.
+If you want to inspect or revive it:
 
-If you need a devnet signer wallet:
-
-```bash
-solana-keygen new --outfile mortem-signer.json
-solana airdrop 1 <pubkey> --url devnet
-```
-
-Put the base58-encoded secret key in `MORTEM_SIGNER_SECRET_KEY`.
-
-The worker writes the resulting memo transaction signature and slot back onto each trace together
-with its Merkle proof, so public verification does not depend on any custom program state.
+- entrypoint: [apps/anchor-worker/src/index.ts](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/src/index.ts)
+- re-enable guide: [apps/anchor-worker/ANCHORING.md](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/ANCHORING.md)
 
 ## Common Scripts
 
@@ -480,6 +454,7 @@ corepack pnpm test
 - Rotate agent API keys from the dashboard if a key leaks.
 - Ollama costs are tracked as externally billed usage, so the dashboard shows "tracked by Ollama" instead of a USD estimate.
 - The server verifies Privy JWTs with `verifyAuthToken` only.
+- The anchor worker is currently decoupled and is not part of the default build, dev, test, or typecheck pipeline.
 
 ## Troubleshooting
 
@@ -511,14 +486,14 @@ For Ollama billing, check https://ollama.com/settings/usage.
 For Anthropic, make sure ANTHROPIC_API_KEY is set.
 ```
 
-If anchoring does not happen:
+If you are trying to use the preserved anchor worker:
 
 ```text
-Run the anchor worker.
+Read apps/anchor-worker/ANCHORING.md first.
 Confirm HELIUS_RPC_URL.
 Confirm MORTEM_SIGNER_SECRET_KEY is funded and valid.
-Confirm the memo signer wallet has enough lamports for transaction fees.
-The anchor worker is currently decoupled; no new traces should be waiting on memo inspection.
+Confirm the signer wallet has enough lamports for transaction fees.
+Restore the ingest/server/dashboard connections before expecting new traces to reach it.
 ```
 
 ## License
