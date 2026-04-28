@@ -1,29 +1,24 @@
 // The trace detail screen presents metadata, timeline replay, context inspection, and analysis in
-// a three-panel layout. It keeps verification and clipboard actions client-side for fast debugging.
+// a three-panel layout. It keeps sharing and clipboard actions client-side for fast debugging.
 "use client"
 
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
 import {
   AlertCircle,
   ArrowLeft,
-  CheckCircle2,
   ChevronRight,
   Copy,
   ExternalLink,
-  GitBranch,
-  KeyRound,
   Loader2,
   RefreshCcw,
   Share2,
-  ShieldCheck,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
 import type { AppRouter } from "../../../../../../server/src/server/root"
 
 type TraceOutput = NonNullable<inferRouterOutputs<AppRouter>["traces"]["get"]>
@@ -66,8 +61,6 @@ type TraceEventView = {
 
 type TraceDetailView = {
   agentId: string
-  anchorSignature: string | null
-  anchorSlot: string | null
   analysis: TraceAnalysisView | null
   durationMs: number | null
   endedAt: Date | null
@@ -76,8 +69,6 @@ type TraceDetailView = {
   events: TraceEventView[]
   id: string
   inputSummary: string
-  merkleProof: string | null
-  merkleRoot: string | null
   outputSummary: string | null
   shareToken: string | null
   solanaTxCount: number
@@ -88,19 +79,10 @@ type TraceDetailView = {
   totalCostUsd: string
   totalLamports: string
   totalTokens: number
-  traceHash: string | null
-}
-
-type VerificationState = {
-  computedRoot?: string
-  kind: "idle" | "verified" | "computed" | "unavailable" | "invalid"
-  message: string
 }
 
 const previewTrace: TraceDetailView = {
   agentId: "01JAGENTPREVIEW",
-  anchorSignature: "5yPreviewAnchorSignature111111111111111111111111111111111",
-  anchorSlot: "339082441",
   analysis: {
     analyzedAt: new Date("2026-04-19T10:15:18.000Z"),
     confidence: 0.82,
@@ -206,9 +188,7 @@ const previewTrace: TraceDetailView = {
   ],
   id: "01JTRACEPREVIEWA",
   inputSummary: "Swap route evaluation for SOL to USDC.",
-  merkleProof: "[]",
-  merkleRoot: "9f3f89dd6a0b8f0e8d2d4f8d5bdc2b7c3b5b5bd4a9dbb9c2b5e15ad9e46c47e5",
-  outputSummary: "Swap sent on devnet and anchored as a singleton proof.",
+  outputSummary: "Swap sent on devnet after the route evaluation completed.",
   shareToken: "01JSHAREPREVIEW",
   solanaTxCount: 1,
   startedAt: new Date("2026-04-19T10:15:00.000Z"),
@@ -218,7 +198,6 @@ const previewTrace: TraceDetailView = {
   totalCostUsd: "0",
   totalLamports: "5000",
   totalTokens: 4320,
-  traceHash: "9f3f89dd6a0b8f0e8d2d4f8d5bdc2b7c3b5b5bd4a9dbb9c2b5e15ad9e46c47e5",
 }
 
 export function TraceDetail({ traceId }: Readonly<{ traceId: string }>) {
@@ -403,15 +382,6 @@ function TraceMetadataPanel({
         <TraceStat label="Lamports" value={trace.totalLamports} />
         <TraceStat label="Txs" value={String(trace.solanaTxCount)} />
       </div>
-
-      <section className="border-b border-border p-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-normal">
-          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-          Memo anchor status
-        </h2>
-        <AnchorVerifier trace={trace} />
-      </section>
-
       <section className="border-b border-border p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-normal">
           <Share2 className="h-4 w-4" aria-hidden="true" />
@@ -660,79 +630,6 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
   )
 }
 
-function AnchorVerifier({ trace }: Readonly<{ trace: TraceDetailView }>) {
-  const [state, setState] = useState<VerificationState>({
-    kind: "idle",
-    message:
-      trace.anchorSignature === null
-        ? "Waiting for a memo anchor transaction."
-        : "Ready to check the local proof.",
-  })
-  const [verifying, setVerifying] = useState(false)
-
-  const verify = async () => {
-    setVerifying(true)
-    try {
-      const result = await verifyTraceAnchor(trace)
-      setState(result)
-    } catch {
-      setState({ kind: "invalid", message: "Proof verification failed in the browser." })
-    } finally {
-      setVerifying(false)
-    }
-  }
-
-  return (
-    <div className="mt-3 space-y-3">
-      <div className="rounded-md border border-border bg-background p-3">
-        <TraceDetailRow
-          label="Signature"
-          value={trace.anchorSignature === null ? "pending" : shorten(trace.anchorSignature)}
-        />
-        <TraceDetailRow label="Slot" value={trace.anchorSlot ?? "pending"} />
-        <TraceDetailRow
-          label="Trace hash"
-          value={trace.traceHash === null ? "missing" : shorten(trace.traceHash)}
-        />
-      </div>
-      <Button type="button" onClick={verify} disabled={verifying}>
-        {verifying ? (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <GitBranch className="h-4 w-4" aria-hidden="true" />
-        )}
-        Verify
-      </Button>
-      <div
-        className={cn(
-          "rounded-md border p-3 text-sm leading-6",
-          state.kind === "verified" &&
-            "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
-          state.kind === "invalid" && "border-destructive/30 bg-destructive/10 text-destructive",
-          state.kind === "computed" &&
-            "border-amber-600/30 bg-amber-500/10 text-amber-800 dark:text-amber-200",
-          (state.kind === "idle" || state.kind === "unavailable") &&
-            "border-border bg-background text-muted-foreground",
-        )}
-      >
-        <div className="flex items-start gap-2">
-          {state.kind === "verified" ? (
-            <CheckCircle2 className="mt-0.5 h-4 w-4" aria-hidden="true" />
-          ) : (
-            <KeyRound className="mt-0.5 h-4 w-4" aria-hidden="true" />
-          )}
-          <div>
-            <p>{state.message}</p>
-            {state.computedRoot === undefined ? null : (
-              <p className="mt-2 break-all font-mono text-xs">root {state.computedRoot}</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function TraceDetailSkeleton() {
   return (
     <main
@@ -846,8 +743,6 @@ function AnalysisBlock({ label, value }: Readonly<{ label: string; value: string
 function toTraceDetailView(trace: TraceOutput): TraceDetailView {
   return {
     agentId: trace.agentId,
-    anchorSignature: trace.anchorSignature,
-    anchorSlot: trace.anchorSlot?.toString() ?? null,
     analysis: trace.analysis === null ? null : toAnalysisView(trace.analysis),
     durationMs: trace.durationMs,
     endedAt: trace.endedAt,
@@ -856,8 +751,6 @@ function toTraceDetailView(trace: TraceOutput): TraceDetailView {
     events: trace.events.map(toEventView),
     id: trace.id,
     inputSummary: trace.inputSummary,
-    merkleProof: trace.merkleProof,
-    merkleRoot: trace.merkleRoot,
     outputSummary: trace.outputSummary,
     shareToken: trace.shareToken,
     solanaTxCount: trace.solanaTxCount,
@@ -868,7 +761,6 @@ function toTraceDetailView(trace: TraceOutput): TraceDetailView {
     totalCostUsd: trace.totalCostUsd.toString(),
     totalLamports: trace.totalLamports.toString(),
     totalTokens: trace.totalTokens,
-    traceHash: trace.traceHash,
   }
 }
 
@@ -924,130 +816,6 @@ function parseCounterfactuals(value: unknown): CounterfactualView[] {
 
     return [{ answer, evidence, question, verdict }]
   })
-}
-
-async function verifyTraceAnchor(trace: TraceDetailView): Promise<VerificationState> {
-  if (trace.anchorSignature === null) {
-    return { kind: "unavailable", message: "This trace has not landed in a memo anchor yet." }
-  }
-
-  if (trace.traceHash === null) {
-    return { kind: "unavailable", message: "This trace does not have a local hash to verify." }
-  }
-
-  const proof = parseMerkleProof(trace.merkleProof)
-  if (proof === null) {
-    return { kind: "invalid", message: "Stored Merkle proof is not valid JSON." }
-  }
-
-  if (trace.merkleRoot === null) {
-    return { kind: "unavailable", message: "Memo root has not been indexed yet." }
-  }
-
-  const verified = await verifyMerkleProofInBrowser(trace.traceHash, proof, trace.merkleRoot)
-
-  if (verified) {
-    return {
-      computedRoot: trace.merkleRoot,
-      kind: "verified",
-      message: "Merkle proof verified against the memo transaction root.",
-    }
-  }
-
-  if (proof.length === 0) {
-    return { kind: "invalid", message: "Singleton proof did not match the memo transaction root." }
-  }
-
-  const computedRoot = await computeRootFromProof(trace.traceHash, proof)
-  return {
-    computedRoot,
-    kind: "invalid",
-    message: "Merkle proof recomputed locally but did not match the memo transaction root.",
-  }
-}
-
-function parseMerkleProof(value: string | null): string[] | null {
-  if (value === null) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown
-    return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
-      ? parsed
-      : null
-  } catch {
-    return null
-  }
-}
-
-async function verifyMerkleProofInBrowser(
-  leaf: string,
-  proof: readonly string[],
-  root: string,
-): Promise<boolean> {
-  const computed = await computeRootFromProof(leaf, proof)
-  return normalizeHash(computed) === normalizeHash(root)
-}
-
-async function computeRootFromProof(leaf: string, proof: readonly string[]): Promise<string> {
-  let computed = normalizeHash(leaf)
-
-  for (const entry of proof) {
-    const separatorIndex = entry.indexOf(":")
-    if (separatorIndex === -1) {
-      throw new Error("Invalid Merkle proof entry")
-    }
-
-    const direction = entry.slice(0, separatorIndex)
-    const sibling = entry.slice(separatorIndex + 1)
-
-    if (direction === "left") {
-      computed = await hashPair(sibling, computed)
-      continue
-    }
-
-    if (direction === "right") {
-      computed = await hashPair(computed, sibling)
-      continue
-    }
-
-    throw new Error("Invalid Merkle proof direction")
-  }
-
-  return computed
-}
-
-async function hashPair(left: string, right: string): Promise<string> {
-  const leftBytes = hexToBytes(normalizeHash(left))
-  const rightBytes = hexToBytes(normalizeHash(right))
-  const bytes = new Uint8Array(leftBytes.length + rightBytes.length)
-  bytes.set(leftBytes, 0)
-  bytes.set(rightBytes, leftBytes.length)
-  const digest = await crypto.subtle.digest("SHA-256", bytes)
-  return bytesToHex(new Uint8Array(digest))
-}
-
-function normalizeHash(hash: string): string {
-  const normalized = hash.startsWith("0x") ? hash.slice(2) : hash
-  if (!/^[0-9a-f]{64}$/iu.test(normalized)) {
-    throw new Error("Invalid 32-byte hex hash")
-  }
-
-  return normalized.toLowerCase()
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let index = 0; index < hex.length; index += 2) {
-    bytes[index / 2] = Number.parseInt(hex.slice(index, index + 2), 16)
-  }
-
-  return bytes
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 function buildEventMarkdown(trace: TraceDetailView, event: TraceEventView): string {
@@ -1138,14 +906,6 @@ function formatCost(value: string): ReactNode {
   }
 
   return `$${numeric.toFixed(6)}`
-}
-
-function shorten(value: string): string {
-  if (value.length <= 16) {
-    return value
-  }
-
-  return `${value.slice(0, 8)}...${value.slice(-8)}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
