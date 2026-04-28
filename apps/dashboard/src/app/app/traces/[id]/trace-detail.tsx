@@ -583,7 +583,9 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
     <section className="p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold tracking-normal">AI Analysis</h2>
-        <Badge variant={failureVariant(analysis.failureType)}>{analysis.failureType}</Badge>
+        <Badge variant={failureVariant(analysis.failureType)}>
+          {failureLabel(analysis.failureType)}
+        </Badge>
       </div>
       <div className="mt-4">
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -967,6 +969,10 @@ function eventVariant(
 function failureVariant(
   failureType: string,
 ): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
+  if (failureType === "none") {
+    return "success"
+  }
+
   if (failureType === "market_condition" || failureType === "model_limit") {
     return "warning"
   }
@@ -980,6 +986,14 @@ function failureVariant(
   }
 
   return "secondary"
+}
+
+function failureLabel(failureType: string): string {
+  if (failureType === "none") {
+    return "healthy"
+  }
+
+  return failureType
 }
 
 function verdictVariant(

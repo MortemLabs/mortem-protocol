@@ -11,6 +11,7 @@ export type EventType =
 export type TraceStatus = "running" | "completed" | "errored" | "timeout"
 
 export type FailureType =
+  | "none"
   | "missing_information"
   | "bad_instruction"
   | "guardrail_gap"

@@ -2,7 +2,7 @@
 // analysis, writes TraceAnalysis, and publishes a ready signal for dashboards.
 import "./load-env"
 import prisma, { type Prisma, PrismaClient } from "@mortemlabs/db"
-import { FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
+import { CounterfactualSchema, FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ulid } from "ulid"
@@ -16,10 +16,32 @@ const globalForAnalysisWorker = globalThis as typeof globalThis & {
   __mortemAnalysisWorkerRunning?: boolean | undefined
 }
 let workerPrisma = prisma
+const CounterfactualInputSchema = CounterfactualSchema
+const normalizeCounterfactuals = (value: unknown): z.infer<typeof CounterfactualSchema>[] => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      const parsed = CounterfactualInputSchema.safeParse(item)
+      return parsed.success ? [parsed.data] : []
+    })
+  }
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return []
+  }
+
+  return [
+    {
+      answer: value.trim(),
+      evidence: "Captured from the analysis model as a summary instead of a structured object.",
+      question: "What would have happened under a different condition?",
+      verdict: "unclear",
+    },
+  ]
+}
 
 const LLMAnalysisSchema = z.object({
-  confidence: z.number().min(0).max(1).default(0.5),
-  counterfactuals: z.array(z.unknown()).default([]),
+  confidence: z.coerce.number().min(0).max(1).catch(0.5),
+  counterfactuals: z.preprocess(normalizeCounterfactuals, z.array(CounterfactualInputSchema)),
   failureType: FailureTypeSchema.default("unknown"),
   suggestedFix: z
     .string()
@@ -30,7 +52,16 @@ const LLMAnalysisSchema = z.object({
 })
 
 const systemPrompt =
-  "You analyze TypeScript AI agent traces for Solana workflows. Return strict JSON with failureType, confidence, summary, whatAgentSaw, whatAgentMissed, counterfactuals, and suggestedFix."
+  [
+    "You analyze TypeScript AI agent traces for Solana workflows.",
+    "Return strict JSON with exactly these keys:",
+    "failureType, confidence, summary, whatAgentSaw, whatAgentMissed, counterfactuals, suggestedFix.",
+    "Allowed failureType values are: none, missing_information, bad_instruction, guardrail_gap, model_limit, market_condition, unknown.",
+    "Use failureType = none when the trace completed successfully with no meaningful issue.",
+    "counterfactuals must be an array of objects with question, answer, evidence, and verdict.",
+    "Allowed verdict values are: avoidable, unavoidable, unclear.",
+    "If there are no meaningful counterfactuals, return counterfactuals as [].",
+  ].join(" ")
 const BACKFILL_BATCH_SIZE = 5
 const ANALYSIS_LOCK_SECONDS = 5 * 60
 const stringifyForLLM = (value: unknown): string =>
@@ -126,7 +157,7 @@ const writeAnalysis = async ({
       create: {
         analyzedAt: new Date(),
         confidence: analysis.confidence,
-        counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+        counterfactuals: analysis.counterfactuals as unknown as Prisma.InputJsonValue,
         failureType: analysis.failureType,
         id: ulid(),
         llmProvider: LLMProviderSchema.parse(llmProvider),
@@ -140,7 +171,7 @@ const writeAnalysis = async ({
       update: {
         analyzedAt: new Date(),
         confidence: analysis.confidence,
-        counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+        counterfactuals: analysis.counterfactuals as unknown as Prisma.InputJsonValue,
         failureType: analysis.failureType,
         llmProvider: LLMProviderSchema.parse(llmProvider),
         modelUsed,

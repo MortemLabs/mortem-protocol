@@ -80,7 +80,7 @@ export default async function SharePage({
             ) : (
               <div className="mt-4 space-y-3 text-sm leading-6">
                 <Badge variant={failureVariant(data.analysis.failureType)}>
-                  {data.analysis.failureType}
+                  {failureLabel(data.analysis.failureType)}
                 </Badge>
                 <p>{data.analysis.summary}</p>
                 <p className="text-muted-foreground">{data.analysis.suggestedFix}</p>
@@ -280,6 +280,10 @@ function eventVariant(
 function failureVariant(
   failureType: string,
 ): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
+  if (failureType === "none") {
+    return "success"
+  }
+
   if (failureType === "market_condition" || failureType === "model_limit") {
     return "warning"
   }
@@ -293,4 +297,12 @@ function failureVariant(
   }
 
   return "secondary"
+}
+
+function failureLabel(failureType: string): string {
+  if (failureType === "none") {
+    return "healthy"
+  }
+
+  return failureType
 }

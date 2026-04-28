@@ -46,6 +46,7 @@ export const TraceStatusSchema = z.enum(["running", "completed", "errored", "tim
 ])
 
 export const FailureTypeSchema = z.enum([
+  "none",
   "missing_information",
   "bad_instruction",
   "guardrail_gap",
