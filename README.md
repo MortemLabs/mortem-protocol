@@ -157,7 +157,7 @@ apikey:{hash}              Agent API key cache
 live:{agentId}             Last 1000 live trace batches
 pubsub:live:{agentId}      Live stream notifications
 agent:connected            First-trace signal for a newly connected agent
-anchor:pending             Trace IDs waiting for memo anchoring
+anchor:pending             UNUSED. reserved for future on-chain anchoring feature
 analysis:pending           Trace IDs waiting for LLM analysis
 analysis:ready:{traceId}   Analysis completion signal
 ratelimit:{agentId}:{min}  Ingest rate limit counter
@@ -518,7 +518,7 @@ Run the anchor worker.
 Confirm HELIUS_RPC_URL.
 Confirm MORTEM_SIGNER_SECRET_KEY is funded and valid.
 Confirm the memo signer wallet has enough lamports for transaction fees.
-Check the stored anchorSignature on the trace and inspect the memo payload in Explorer.
+The anchor worker is currently decoupled; no new traces should be waiting on memo inspection.
 ```
 
 ## License
