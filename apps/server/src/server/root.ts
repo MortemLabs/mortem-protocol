@@ -3,14 +3,12 @@
 import { agentsRouter } from "./routers/agents"
 import { analysisRouter } from "./routers/analysis"
 import { tracesRouter } from "./routers/traces"
-import { verifyRouter } from "./routers/verify"
 import { createTRPCRouter } from "./trpc"
 
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,
   analysis: analysisRouter,
   traces: tracesRouter,
-  verify: verifyRouter,
 })
 
 export type AppRouter = typeof appRouter
