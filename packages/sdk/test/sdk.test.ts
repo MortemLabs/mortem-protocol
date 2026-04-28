@@ -181,6 +181,60 @@ describe("Mortem SDK wrappers", () => {
 })
 
 describe("Mortem SDK buffer", () => {
+  it("flushes completion updates that are queued during an in-flight send", async () => {
+    const bodies: Buffer[] = []
+    let releaseFirstResponse: (() => void) | undefined
+    let firstRequestStarted: (() => void) | undefined
+    const firstRequestObserved = new Promise<void>((resolve) => {
+      firstRequestStarted = resolve
+    })
+    const firstResponseReleased = new Promise<void>((resolve) => {
+      releaseFirstResponse = resolve
+    })
+    let requestCount = 0
+
+    const fetchMock: typeof fetch = async (_input, init) => {
+      requestCount += 1
+      const body = init?.body
+
+      if (body instanceof Uint8Array) {
+        bodies.push(Buffer.from(body))
+      }
+
+      if (requestCount === 1) {
+        firstRequestStarted?.()
+        await firstResponseReleased
+      }
+
+      return new Response(null, { status: 202 })
+    }
+
+    const mortem = new Mortem({
+      agentId: "agent_01",
+      apiKey: "test_api_key",
+      fetch: fetchMock,
+      flushIntervalMs: 60_000,
+      ingestUrl: "https://ingest.test",
+    })
+
+    const session = await mortem.startSession({ inputSummary: "test run" })
+    session.beginEvent("custom", { name: "step", data: null }).complete()
+
+    const firstFlush = mortem.flush()
+    await firstRequestObserved
+
+    const completePromise = session.complete()
+    releaseFirstResponse?.()
+
+    await Promise.all([firstFlush, completePromise])
+
+    expect(bodies).toHaveLength(2)
+
+    const finalBatch = parseBatch(bodies[1] as Buffer)
+    expect(finalBatch.items.at(-1)?.trace.status).toBe("completed")
+    expect(finalBatch.items.at(-1)?.trace.endedAt).not.toBeNull()
+  })
+
   it("exposes traceId as an alias for the session id", async () => {
     const mortem = new Mortem({
       agentId: "agent_01",

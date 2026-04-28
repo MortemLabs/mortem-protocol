@@ -33,8 +33,8 @@ export class MortemBuffer {
   private readonly options: MortemBufferOptions
   private readonly endpoint: string
   private readonly queue: BufferBatchItem[] = []
+  private flushPromise: Promise<void> | undefined
   private queuedBytes = 0
-  private flushing = false
   private timer: ReturnType<typeof setInterval> | undefined
   private verifyTokenSent = false
 
@@ -68,21 +68,21 @@ export class MortemBuffer {
   }
 
   async flush(): Promise<void> {
-    if (this.flushing || this.queue.length === 0 || !this.options.enabled) {
+    if (!this.options.enabled) {
       return
     }
 
-    const batch = this.queue.splice(0, this.queue.length)
-    this.queuedBytes = 0
-    this.flushing = true
-
-    try {
-      await this.sendWithRetries(batch)
-    } catch {
-      this.warn("Mortem buffer flush failed")
-    } finally {
-      this.flushing = false
+    if (this.flushPromise !== undefined) {
+      await this.flushPromise
+      return
     }
+
+    if (this.queue.length === 0) {
+      return
+    }
+
+    this.flushPromise = this.runFlush()
+    await this.flushPromise
   }
 
   async close(): Promise<void> {
@@ -92,6 +92,20 @@ export class MortemBuffer {
     }
 
     await this.flush()
+  }
+
+  private async runFlush(): Promise<void> {
+    try {
+      while (this.queue.length > 0) {
+        const batch = this.queue.splice(0, this.queue.length)
+        this.queuedBytes = 0
+        await this.sendWithRetries(batch)
+      }
+    } catch {
+      this.warn("Mortem buffer flush failed")
+    } finally {
+      this.flushPromise = undefined
+    }
   }
 
   private async sendWithRetries(batch: BufferBatchItem[]): Promise<void> {
