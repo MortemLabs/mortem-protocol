@@ -13,6 +13,7 @@ import { getRedis } from "./redis"
 const POLL_INTERVAL_MS = 5_000
 const globalForAnalysisWorker = globalThis as typeof globalThis & {
   __mortemAnalysisWorker?: ReturnType<typeof setInterval> | undefined
+  __mortemAnalysisWorkerRunning?: boolean | undefined
 }
 
 const LLMAnalysisSchema = z.object({
@@ -30,23 +31,120 @@ const LLMAnalysisSchema = z.object({
 const systemPrompt =
   "You analyze TypeScript AI agent traces for Solana workflows. Return strict JSON with failureType, confidence, summary, whatAgentSaw, whatAgentMissed, counterfactuals, and suggestedFix."
 const BACKFILL_BATCH_SIZE = 5
+const ANALYSIS_LOCK_SECONDS = 5 * 60
 const stringifyForLLM = (value: unknown): string =>
   JSON.stringify(value, (_key, item: unknown) =>
     typeof item === "bigint" ? item.toString() : item,
   )
 
-const parseAnalysis = (raw: string): z.infer<typeof LLMAnalysisSchema> => {
+const extractJsonObject = (raw: string): unknown => {
   try {
-    return LLMAnalysisSchema.parse(JSON.parse(raw) as unknown)
+    return JSON.parse(raw) as unknown
   } catch {
-    return LLMAnalysisSchema.parse({})
+    const start = raw.indexOf("{")
+    const end = raw.lastIndexOf("}")
+
+    if (start === -1 || end <= start) {
+      throw new Error("LLM response did not contain a JSON object")
+    }
+
+    return JSON.parse(raw.slice(start, end + 1)) as unknown
   }
 }
 
+const parseAnalysis = (raw: string): z.infer<typeof LLMAnalysisSchema> => {
+  try {
+    const parsed = extractJsonObject(raw)
+    const analysis = LLMAnalysisSchema.safeParse(parsed)
+
+    if (analysis.success) {
+      return analysis.data
+    }
+
+    console.warn("[analysis-worker] LLM analysis did not match schema", analysis.error.flatten())
+  } catch (error) {
+    console.warn("[analysis-worker] could not parse LLM analysis response", {
+      error: error instanceof Error ? error.message : String(error),
+      raw: raw.slice(0, 500),
+    })
+  }
+
+  return LLMAnalysisSchema.parse({
+    confidence: 0,
+    failureType: "unknown",
+    suggestedFix: "Inspect the trace payload manually; the analysis model returned invalid JSON.",
+    summary: "Mortem could not parse a structured analysis from the configured LLM.",
+    whatAgentMissed: "Unknown because the analysis response was invalid.",
+    whatAgentSaw: "Unknown because the analysis response was invalid.",
+  })
+}
+
+const providerFromEnv = (): "anthropic" | "ollama" =>
+  process.env.LLM_PROVIDER === "anthropic" ? "anthropic" : "ollama"
+
+const modelFromEnv = (provider: "anthropic" | "ollama"): string =>
+  provider === "anthropic"
+    ? (process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514")
+    : (process.env.OLLAMA_MODEL ?? "")
+
+const writeAnalysis = async ({
+  analysis,
+  llmProvider,
+  modelUsed,
+  traceId,
+}: {
+  analysis: z.infer<typeof LLMAnalysisSchema>
+  llmProvider: "anthropic" | "ollama"
+  modelUsed: string
+  traceId: string
+}): Promise<void> => {
+  await prisma.traceAnalysis.upsert({
+    create: {
+      analyzedAt: new Date(),
+      confidence: analysis.confidence,
+      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+      failureType: analysis.failureType,
+      id: ulid(),
+      llmProvider: LLMProviderSchema.parse(llmProvider),
+      modelUsed,
+      suggestedFix: analysis.suggestedFix,
+      summary: analysis.summary,
+      traceId,
+      whatAgentMissed: analysis.whatAgentMissed,
+      whatAgentSaw: analysis.whatAgentSaw,
+    },
+    update: {
+      analyzedAt: new Date(),
+      confidence: analysis.confidence,
+      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+      failureType: analysis.failureType,
+      llmProvider: LLMProviderSchema.parse(llmProvider),
+      modelUsed,
+      suggestedFix: analysis.suggestedFix,
+      summary: analysis.summary,
+      whatAgentMissed: analysis.whatAgentMissed,
+      whatAgentSaw: analysis.whatAgentSaw,
+    },
+    where: { traceId },
+  })
+}
+
 const analyzeTrace = async (traceId: string): Promise<void> => {
+  const redis = getRedis()
+  const lock = await redis.set(`analysis:lock:${traceId}`, "1", {
+    ex: ANALYSIS_LOCK_SECONDS,
+    nx: true,
+  })
+
+  if (lock !== "OK") {
+    console.info(`[analysis-worker] trace ${traceId} is already being analyzed; skipping`)
+    return
+  }
+
   console.info(`[analysis-worker] analyzing trace ${traceId}`)
   const trace = await prisma.trace.findUnique({
     include: {
+      analysis: { select: { id: true } },
       events: { orderBy: { sequence: "asc" } },
     },
     where: { id: traceId },
@@ -54,6 +152,36 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
 
   if (trace === null) {
     console.warn(`[analysis-worker] trace ${traceId} no longer exists; skipping`)
+    return
+  }
+
+  if (trace.analysis !== null) {
+    console.info(`[analysis-worker] trace ${traceId} already has analysis; skipping`)
+    return
+  }
+
+  if (trace.events.length === 0) {
+    const provider = providerFromEnv()
+
+    await writeAnalysis({
+      analysis: LLMAnalysisSchema.parse({
+        confidence: 0.95,
+        failureType: "unknown",
+        suggestedFix:
+          "Wrap the LLM, tool, or Solana clients used by this agent, then run it again so Mortem can capture trace events.",
+        summary:
+          "The trace completed, but Mortem did not capture any child events for the run.",
+        whatAgentMissed:
+          "Mortem cannot inspect the agent's reasoning because no LLM calls, tool calls, or Solana calls were recorded.",
+        whatAgentSaw:
+          "Only the top-level session metadata was recorded: status, start/end time, and summary.",
+      }),
+      llmProvider: provider,
+      modelUsed: modelFromEnv(provider),
+      traceId,
+    })
+    await redis.publish(`analysis:ready:${traceId}`, JSON.stringify({ traceId }))
+    console.info(`[analysis-worker] analysis ready for empty trace ${traceId}`)
     return
   }
 
@@ -67,37 +195,14 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
   )
   const analysis = parseAnalysis(raw)
 
-  await prisma.traceAnalysis.upsert({
-    create: {
-      analyzedAt: new Date(),
-      confidence: analysis.confidence,
-      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
-      failureType: analysis.failureType,
-      id: ulid(),
-      llmProvider: LLMProviderSchema.parse(llm.provider),
-      modelUsed: llm.modelId,
-      suggestedFix: analysis.suggestedFix,
-      summary: analysis.summary,
-      traceId,
-      whatAgentMissed: analysis.whatAgentMissed,
-      whatAgentSaw: analysis.whatAgentSaw,
-    },
-    update: {
-      analyzedAt: new Date(),
-      confidence: analysis.confidence,
-      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
-      failureType: analysis.failureType,
-      llmProvider: LLMProviderSchema.parse(llm.provider),
-      modelUsed: llm.modelId,
-      suggestedFix: analysis.suggestedFix,
-      summary: analysis.summary,
-      whatAgentMissed: analysis.whatAgentMissed,
-      whatAgentSaw: analysis.whatAgentSaw,
-    },
-    where: { traceId },
+  await writeAnalysis({
+    analysis,
+    llmProvider: llm.provider,
+    modelUsed: llm.modelId,
+    traceId,
   })
 
-  await getRedis().publish(`analysis:ready:${traceId}`, JSON.stringify({ traceId }))
+  await redis.publish(`analysis:ready:${traceId}`, JSON.stringify({ traceId }))
   console.info(`[analysis-worker] analysis ready for trace ${traceId}`)
 }
 
@@ -122,8 +227,8 @@ export const runAnalysisWorkerOnce = async (): Promise<number> => {
 
   for (const traceId of traceIds) {
     try {
-      await analyzeTrace(traceId)
       await redis.lrem("analysis:pending", 0, traceId)
+      await analyzeTrace(traceId)
       processed += 1
     } catch (error) {
       console.error(`[analysis-worker] failed to analyze trace ${traceId}`, error)
@@ -133,18 +238,33 @@ export const runAnalysisWorkerOnce = async (): Promise<number> => {
   return processed
 }
 
+const runAnalysisWorkerTick = async (): Promise<void> => {
+  if (globalForAnalysisWorker.__mortemAnalysisWorkerRunning === true) {
+    console.info("[analysis-worker] previous run still active; skipping tick")
+    return
+  }
+
+  globalForAnalysisWorker.__mortemAnalysisWorkerRunning = true
+
+  try {
+    await runAnalysisWorkerOnce()
+  } finally {
+    globalForAnalysisWorker.__mortemAnalysisWorkerRunning = false
+  }
+}
+
 export const startAnalysisWorker = (): ReturnType<typeof setInterval> => {
   if (globalForAnalysisWorker.__mortemAnalysisWorker !== undefined) {
     return globalForAnalysisWorker.__mortemAnalysisWorker
   }
 
   console.info(`[analysis-worker] started; polling every ${POLL_INTERVAL_MS}ms`)
-  void runAnalysisWorkerOnce().catch((error: unknown) => {
+  void runAnalysisWorkerTick().catch((error: unknown) => {
     console.error("[analysis-worker] initial run failed", error)
   })
 
   const interval = setInterval(() => {
-    void runAnalysisWorkerOnce().catch((error: unknown) => {
+    void runAnalysisWorkerTick().catch((error: unknown) => {
       console.error("[analysis-worker] run failed", error)
     })
   }, POLL_INTERVAL_MS)

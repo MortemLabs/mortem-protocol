@@ -7,10 +7,16 @@ export interface RedisLike {
   lpush(key: string, ...values: string[]): Promise<unknown>
   lrem(key: string, count: number, value: string): Promise<unknown>
   publish(channel: string, message: string): Promise<unknown>
+  set(
+    key: string,
+    value: string,
+    options?: { ex?: number | undefined; nx?: boolean | undefined },
+  ): Promise<unknown>
 }
 
 class MemoryRedis implements RedisLike {
   private readonly lists = new Map<string, string[]>()
+  private readonly values = new Map<string, string>()
 
   async lpush(key: string, ...values: string[]): Promise<unknown> {
     const list = this.lists.get(key) ?? []
@@ -45,6 +51,19 @@ class MemoryRedis implements RedisLike {
 
   async publish(_channel: string, _message: string): Promise<unknown> {
     return 0
+  }
+
+  async set(
+    key: string,
+    value: string,
+    options?: { ex?: number | undefined; nx?: boolean | undefined },
+  ): Promise<unknown> {
+    if (options?.nx === true && this.values.has(key)) {
+      return null
+    }
+
+    this.values.set(key, value)
+    return "OK"
   }
 }
 

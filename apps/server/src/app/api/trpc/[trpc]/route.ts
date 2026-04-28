@@ -1,11 +1,8 @@
 // The tRPC route handler exposes the App Router fetch adapter for all server procedures. Context is
 // created per request so Authorization headers can carry Privy JWTs from the dashboard.
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch"
-import { ensureAnalysisWorkerStarted } from "../../../../server/analysis-worker"
 import { createTRPCContext } from "../../../../server/context"
 import { appRouter } from "../../../../server/root"
-
-ensureAnalysisWorkerStarted()
 
 const corsHeaders = (request: Request): Headers => {
   const headers = new Headers()
