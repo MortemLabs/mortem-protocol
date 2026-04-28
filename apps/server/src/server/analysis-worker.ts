@@ -3,6 +3,8 @@
 import "./load-env"
 import prisma, { type Prisma } from "@mortemlabs/db"
 import { FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
+import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { ulid } from "ulid"
 import { z } from "zod"
 import { getLLMClient } from "../lib/llm"
@@ -27,6 +29,11 @@ const LLMAnalysisSchema = z.object({
 
 const systemPrompt =
   "You analyze TypeScript AI agent traces for Solana workflows. Return strict JSON with failureType, confidence, summary, whatAgentSaw, whatAgentMissed, counterfactuals, and suggestedFix."
+const BACKFILL_BATCH_SIZE = 5
+const stringifyForLLM = (value: unknown): string =>
+  JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === "bigint" ? item.toString() : item,
+  )
 
 const parseAnalysis = (raw: string): z.infer<typeof LLMAnalysisSchema> => {
   try {
@@ -53,7 +60,7 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
   const llm = await getLLMClient()
   const raw = await llm.complete(
     systemPrompt,
-    JSON.stringify({
+    stringifyForLLM({
       events: trace.events,
       trace,
     }),
@@ -97,17 +104,30 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
 export const runAnalysisWorkerOnce = async (): Promise<number> => {
   const redis = getRedis()
   const pending = await redis.lrange<string>("analysis:pending", 0, -1)
+  const missingAnalyses = await prisma.trace.findMany({
+    orderBy: { endedAt: "desc" },
+    select: { id: true },
+    take: BACKFILL_BATCH_SIZE,
+    where: {
+      analysis: null,
+      status: { in: ["completed", "errored"] },
+    },
+  })
   let processed = 0
-  const traceIds = [...new Set(pending)]
+  const traceIds = [...new Set([...pending, ...missingAnalyses.map((trace) => trace.id)])]
 
   if (traceIds.length > 0) {
     console.info(`[analysis-worker] found ${traceIds.length} pending trace(s)`)
   }
 
   for (const traceId of traceIds) {
-    await analyzeTrace(traceId)
-    await redis.lrem("analysis:pending", 0, traceId)
-    processed += 1
+    try {
+      await analyzeTrace(traceId)
+      await redis.lrem("analysis:pending", 0, traceId)
+      processed += 1
+    } catch (error) {
+      console.error(`[analysis-worker] failed to analyze trace ${traceId}`, error)
+    }
   }
 
   return processed
@@ -142,6 +162,9 @@ export const ensureAnalysisWorkerStarted = (): ReturnType<typeof setInterval> | 
   return startAnalysisWorker()
 }
 
-if (process.env.ANALYSIS_WORKER_AUTOSTART !== "false") {
+const isDirectRun =
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])
+
+if (isDirectRun && process.env.ANALYSIS_WORKER_AUTOSTART !== "false") {
   ensureAnalysisWorkerStarted()
 }
