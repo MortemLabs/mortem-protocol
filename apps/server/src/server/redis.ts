@@ -50,19 +50,51 @@ class MemoryRedis implements RedisLike {
 
 let redisSingleton: RedisLike | undefined
 
+const readEnv = (name: string): string | undefined => {
+  const value = process.env[name]
+  return value === undefined || value.length === 0 ? undefined : value
+}
+
+const isPlaceholderRedisUrl = (url: string): boolean => url.includes("example-upstash.upstash.io")
+
+const resolveRedisConfig = ():
+  | { token: string; url: string; source: "REDIS" | "UPSTASH_REDIS_REST" }
+  | undefined => {
+  const redisUrl = readEnv("REDIS_URL")
+  const redisToken = readEnv("REDIS_TOKEN")
+
+  if (redisUrl !== undefined && redisToken !== undefined && !isPlaceholderRedisUrl(redisUrl)) {
+    return { source: "REDIS", token: redisToken, url: redisUrl }
+  }
+
+  const upstashUrl = readEnv("UPSTASH_REDIS_REST_URL")
+  const upstashToken = readEnv("UPSTASH_REDIS_REST_TOKEN")
+
+  if (
+    upstashUrl !== undefined &&
+    upstashToken !== undefined &&
+    !isPlaceholderRedisUrl(upstashUrl)
+  ) {
+    return { source: "UPSTASH_REDIS_REST", token: upstashToken, url: upstashUrl }
+  }
+
+  return undefined
+}
+
 export const getRedis = (): RedisLike => {
   if (redisSingleton !== undefined) {
     return redisSingleton
   }
 
-  const url = process.env.REDIS_URL ?? process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.REDIS_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
+  const config = resolveRedisConfig()
 
-  if (url !== undefined && token !== undefined) {
-    redisSingleton = new Redis({ token, url }) as RedisLike
+  if (config !== undefined) {
+    console.info(`[server-redis] using ${config.source} credentials`)
+    redisSingleton = new Redis({ token: config.token, url: config.url }) as RedisLike
     return redisSingleton
   }
 
+  console.warn("[server-redis] using in-memory Redis; cross-process queues will not work")
   redisSingleton = new MemoryRedis()
   return redisSingleton
 }

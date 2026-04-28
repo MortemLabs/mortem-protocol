@@ -8,6 +8,9 @@ import { getLLMClient } from "../lib/llm"
 import { getRedis } from "./redis"
 
 const POLL_INTERVAL_MS = 5_000
+const globalForAnalysisWorker = globalThis as typeof globalThis & {
+  __mortemAnalysisWorker?: ReturnType<typeof setInterval> | undefined
+}
 
 const LLMAnalysisSchema = z.object({
   confidence: z.number().min(0).max(1).default(0.5),
@@ -33,6 +36,7 @@ const parseAnalysis = (raw: string): z.infer<typeof LLMAnalysisSchema> => {
 }
 
 const analyzeTrace = async (traceId: string): Promise<void> => {
+  console.info(`[analysis-worker] analyzing trace ${traceId}`)
   const trace = await prisma.trace.findUnique({
     include: {
       events: { orderBy: { sequence: "asc" } },
@@ -41,6 +45,7 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
   })
 
   if (trace === null) {
+    console.warn(`[analysis-worker] trace ${traceId} no longer exists; skipping`)
     return
   }
 
@@ -85,14 +90,20 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
   })
 
   await getRedis().publish(`analysis:ready:${traceId}`, JSON.stringify({ traceId }))
+  console.info(`[analysis-worker] analysis ready for trace ${traceId}`)
 }
 
 export const runAnalysisWorkerOnce = async (): Promise<number> => {
   const redis = getRedis()
   const pending = await redis.lrange<string>("analysis:pending", 0, -1)
   let processed = 0
+  const traceIds = [...new Set(pending)]
 
-  for (const traceId of [...new Set(pending)]) {
+  if (traceIds.length > 0) {
+    console.info(`[analysis-worker] found ${traceIds.length} pending trace(s)`)
+  }
+
+  for (const traceId of traceIds) {
     await analyzeTrace(traceId)
     await redis.lrem("analysis:pending", 0, traceId)
     processed += 1
@@ -101,11 +112,36 @@ export const runAnalysisWorkerOnce = async (): Promise<number> => {
   return processed
 }
 
-export const startAnalysisWorker = (): ReturnType<typeof setInterval> =>
-  setInterval(() => {
-    void runAnalysisWorkerOnce()
+export const startAnalysisWorker = (): ReturnType<typeof setInterval> => {
+  if (globalForAnalysisWorker.__mortemAnalysisWorker !== undefined) {
+    return globalForAnalysisWorker.__mortemAnalysisWorker
+  }
+
+  console.info(`[analysis-worker] started; polling every ${POLL_INTERVAL_MS}ms`)
+  void runAnalysisWorkerOnce().catch((error: unknown) => {
+    console.error("[analysis-worker] initial run failed", error)
+  })
+
+  const interval = setInterval(() => {
+    void runAnalysisWorkerOnce().catch((error: unknown) => {
+      console.error("[analysis-worker] run failed", error)
+    })
   }, POLL_INTERVAL_MS)
 
+  interval.unref?.()
+  globalForAnalysisWorker.__mortemAnalysisWorker = interval
+  return interval
+}
+
+export const ensureAnalysisWorkerStarted = (): ReturnType<typeof setInterval> | undefined => {
+  if (process.env.ANALYSIS_WORKER_AUTOSTART === "false") {
+    console.info("[analysis-worker] autostart disabled")
+    return undefined
+  }
+
+  return startAnalysisWorker()
+}
+
 if (process.env.ANALYSIS_WORKER_AUTOSTART !== "false") {
-  startAnalysisWorker()
+  ensureAnalysisWorkerStarted()
 }

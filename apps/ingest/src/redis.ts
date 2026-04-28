@@ -91,6 +91,7 @@ export const getRedis = (): RedisLike => {
   const env = getIngestEnv()
 
   if (env.redisUrl !== undefined && env.redisToken !== undefined) {
+    console.info("[ingest-redis] using configured Redis credentials")
     redisSingleton = new Redis({
       token: env.redisToken,
       url: env.redisUrl,
@@ -98,6 +99,7 @@ export const getRedis = (): RedisLike => {
     return redisSingleton
   }
 
+  console.warn("[ingest-redis] using in-memory Redis; cross-process queues will not work")
   redisSingleton = new MemoryRedis()
   return redisSingleton
 }
