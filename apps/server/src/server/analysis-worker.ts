@@ -1,5 +1,6 @@
 // The analysis worker consumes trace IDs from Redis, asks the configured LLM for structured failure
 // analysis, writes TraceAnalysis, and publishes a ready signal for dashboards.
+import "./load-env"
 import prisma, { type Prisma } from "@mortemlabs/db"
 import { FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
 import { ulid } from "ulid"
@@ -128,7 +129,6 @@ export const startAnalysisWorker = (): ReturnType<typeof setInterval> => {
     })
   }, POLL_INTERVAL_MS)
 
-  interval.unref?.()
   globalForAnalysisWorker.__mortemAnalysisWorker = interval
   return interval
 }
