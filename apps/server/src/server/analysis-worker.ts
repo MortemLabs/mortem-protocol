@@ -1,7 +1,7 @@
 // The analysis worker consumes trace IDs from Redis, asks the configured LLM for structured failure
 // analysis, writes TraceAnalysis, and publishes a ready signal for dashboards.
 import "./load-env"
-import prisma, { type Prisma } from "@mortemlabs/db"
+import prisma, { type Prisma, PrismaClient } from "@mortemlabs/db"
 import { FailureTypeSchema, LLMProviderSchema } from "@mortemlabs/shared"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -15,6 +15,7 @@ const globalForAnalysisWorker = globalThis as typeof globalThis & {
   __mortemAnalysisWorker?: ReturnType<typeof setInterval> | undefined
   __mortemAnalysisWorkerRunning?: boolean | undefined
 }
+let workerPrisma = prisma
 
 const LLMAnalysisSchema = z.object({
   confidence: z.number().min(0).max(1).default(0.5),
@@ -36,6 +37,28 @@ const stringifyForLLM = (value: unknown): string =>
   JSON.stringify(value, (_key, item: unknown) =>
     typeof item === "bigint" ? item.toString() : item,
   )
+const isPrismaConnectionClosedError = (error: unknown): error is { code: string } =>
+  typeof error === "object" && error !== null && "code" in error && error.code === "P1017"
+
+const withPrismaReconnect = async <T>(
+  label: string,
+  operation: () => Promise<T>,
+): Promise<T> => {
+  try {
+    return await operation()
+  } catch (error) {
+    if (!isPrismaConnectionClosedError(error)) {
+      throw error
+    }
+
+    console.warn(`[analysis-worker] prisma connection closed during ${label}; reconnecting`)
+    const previousPrisma = workerPrisma
+    await previousPrisma.$disconnect().catch(() => undefined)
+    workerPrisma = new PrismaClient()
+    await workerPrisma.$connect()
+    return operation()
+  }
+}
 
 const extractJsonObject = (raw: string): unknown => {
   try {
@@ -98,35 +121,37 @@ const writeAnalysis = async ({
   modelUsed: string
   traceId: string
 }): Promise<void> => {
-  await prisma.traceAnalysis.upsert({
-    create: {
-      analyzedAt: new Date(),
-      confidence: analysis.confidence,
-      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
-      failureType: analysis.failureType,
-      id: ulid(),
-      llmProvider: LLMProviderSchema.parse(llmProvider),
-      modelUsed,
-      suggestedFix: analysis.suggestedFix,
-      summary: analysis.summary,
-      traceId,
-      whatAgentMissed: analysis.whatAgentMissed,
-      whatAgentSaw: analysis.whatAgentSaw,
-    },
-    update: {
-      analyzedAt: new Date(),
-      confidence: analysis.confidence,
-      counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
-      failureType: analysis.failureType,
-      llmProvider: LLMProviderSchema.parse(llmProvider),
-      modelUsed,
-      suggestedFix: analysis.suggestedFix,
-      summary: analysis.summary,
-      whatAgentMissed: analysis.whatAgentMissed,
-      whatAgentSaw: analysis.whatAgentSaw,
-    },
-    where: { traceId },
-  })
+  await withPrismaReconnect(`write analysis ${traceId}`, () =>
+    workerPrisma.traceAnalysis.upsert({
+      create: {
+        analyzedAt: new Date(),
+        confidence: analysis.confidence,
+        counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+        failureType: analysis.failureType,
+        id: ulid(),
+        llmProvider: LLMProviderSchema.parse(llmProvider),
+        modelUsed,
+        suggestedFix: analysis.suggestedFix,
+        summary: analysis.summary,
+        traceId,
+        whatAgentMissed: analysis.whatAgentMissed,
+        whatAgentSaw: analysis.whatAgentSaw,
+      },
+      update: {
+        analyzedAt: new Date(),
+        confidence: analysis.confidence,
+        counterfactuals: analysis.counterfactuals as Prisma.InputJsonValue,
+        failureType: analysis.failureType,
+        llmProvider: LLMProviderSchema.parse(llmProvider),
+        modelUsed,
+        suggestedFix: analysis.suggestedFix,
+        summary: analysis.summary,
+        whatAgentMissed: analysis.whatAgentMissed,
+        whatAgentSaw: analysis.whatAgentSaw,
+      },
+      where: { traceId },
+    }),
+  )
 }
 
 const analyzeTrace = async (traceId: string): Promise<void> => {
@@ -142,13 +167,15 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
   }
 
   console.info(`[analysis-worker] analyzing trace ${traceId}`)
-  const trace = await prisma.trace.findUnique({
-    include: {
-      analysis: { select: { id: true } },
-      events: { orderBy: { sequence: "asc" } },
-    },
-    where: { id: traceId },
-  })
+  const trace = await withPrismaReconnect(`load trace ${traceId}`, () =>
+    workerPrisma.trace.findUnique({
+      include: {
+        analysis: { select: { id: true } },
+        events: { orderBy: { sequence: "asc" } },
+      },
+      where: { id: traceId },
+    }),
+  )
 
   if (trace === null) {
     console.warn(`[analysis-worker] trace ${traceId} no longer exists; skipping`)
@@ -209,15 +236,17 @@ const analyzeTrace = async (traceId: string): Promise<void> => {
 export const runAnalysisWorkerOnce = async (): Promise<number> => {
   const redis = getRedis()
   const pending = await redis.lrange<string>("analysis:pending", 0, -1)
-  const missingAnalyses = await prisma.trace.findMany({
-    orderBy: { endedAt: "desc" },
-    select: { id: true },
-    take: BACKFILL_BATCH_SIZE,
-    where: {
-      analysis: null,
-      status: { in: ["completed", "errored"] },
-    },
-  })
+  const missingAnalyses = await withPrismaReconnect("scan missing analyses", () =>
+    workerPrisma.trace.findMany({
+      orderBy: { endedAt: "desc" },
+      select: { id: true },
+      take: BACKFILL_BATCH_SIZE,
+      where: {
+        analysis: null,
+        status: { in: ["completed", "errored"] },
+      },
+    }),
+  )
   let processed = 0
   const traceIds = [...new Set([...pending, ...missingAnalyses.map((trace) => trace.id)])]
 
