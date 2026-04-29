@@ -1,10 +1,12 @@
-/* Mortem's dashboard styles use Tailwind v4 tokens and shadcn-compatible CSS variables. */
-/* Page and component colors should reference these variables instead of hardcoded hex values. */
+/* Mortem brand tokens — ink dominates, paper carries type, signal is rationed.
+   Shadcn-compatible variable names so existing components inherit the theme. */
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -24,70 +26,159 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+
+  --color-ink: hsl(var(--ink));
+  --color-ink-2: hsl(var(--ink-2));
+  --color-ink-3: hsl(var(--ink-3));
+  --color-paper: hsl(var(--paper));
+  --color-signal: hsl(var(--signal));
+  --color-line: hsl(var(--line));
+  --color-line-dim: hsl(var(--line-dim));
+  --color-fg-faint: hsl(var(--fg-faint));
+  --color-fg-muted: hsl(var(--fg-muted));
+
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
 }
 
-:root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 72.2% 50.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --radius: 0.5rem;
-}
-
+/* Brand canvas defaults to ink. Light "paper" surfaces only inside cards. */
+:root,
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --ink: 24 8% 5%;
+  --ink-2: 30 8% 9%;
+  --ink-3: 30 8% 14%;
+  --paper: 60 10% 92%;
+  --signal: 0 72% 51%;
+  --line: 30 8% 21%;
+  --line-dim: 30 8% 14%;
+  --fg-faint: 30 5% 34%;
+  --fg-muted: 35 6% 51%;
+
+  --background: var(--ink);
+  --foreground: var(--paper);
+  --card: var(--ink-2);
+  --card-foreground: var(--paper);
+  --popover: var(--ink-2);
+  --popover-foreground: var(--paper);
+  --primary: var(--signal);
+  --primary-foreground: var(--paper);
+  --secondary: var(--ink-3);
+  --secondary-foreground: var(--paper);
+  --muted: var(--ink-3);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--ink-3);
+  --accent-foreground: var(--paper);
+  --destructive: var(--signal);
+  --destructive-foreground: var(--paper);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--signal);
+  --radius: 0;
+}
+
+/* Paper surface — invert when content is on a deliberate light card (death certificate, etc). */
+.surface-paper {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --muted: 40 6% 84%;
+  --muted-foreground: 30 6% 30%;
+  --border: 30 12% 47%;
+  background: hsl(var(--paper));
+  color: hsl(var(--ink));
 }
 
 * {
   border-color: hsl(var(--border));
 }
 
+html,
 body {
-  min-height: 100vh;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11", "calt";
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 a,
 button {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Selection bleeds red — file marking, not link highlight. */
+::selection {
+  background: hsl(var(--signal));
+  color: hsl(var(--paper));
+}
+
+/* Brand utilities. Use these instead of one-off class soup. */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: hsl(var(--fg-muted));
+}
+
+.case-meta {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Headline ends in a red period stamp: <h1 className="stamp">Mortem</h1> */
+.stamp::after {
+  content: ".";
+  color: hsl(var(--signal));
+  margin-left: 0.05em;
+}
+
+/* Diagonal red/ink barricade tape. */
+.tape {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--signal)) 0 8px,
+    hsl(var(--ink)) 8px 16px
+  );
+}
+
+/* Thin hairline divider, brand-correct on both surfaces. */
+.hairline {
+  border-bottom: 1px solid hsl(var(--line));
+}
+
+/* Death-stamp pill — outlined red, mono, slight rotation. */
+.death-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.25rem 0.6rem;
+  border: 2px solid hsl(var(--signal));
+  color: hsl(var(--signal));
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+}
+
+/* Status dot for ALIVE / DECEASED ticker pills. */
+.status-dot::before {
+  content: "●";
+  margin-right: 0.4em;
 }
