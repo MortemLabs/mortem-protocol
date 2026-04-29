@@ -184,18 +184,9 @@ Ollama is the default and uses the hosted cloud API — no local installation ne
 
 ### Anchor Worker
 
-`apps/anchor-worker` remains in the repository, but it is currently decoupled from ingest, server,
-and dashboard flows.
-
-Today that means:
-
-- ingest does not enqueue traces for anchoring
-- server trace responses do not expose anchor metadata
-- dashboard trace and share pages do not show anchor or verification UI
-- root Turbo scripts exclude `@mortemlabs/anchor-worker`
-
-If you want to re-enable anchoring later, see
-[`apps/anchor-worker/ANCHORING.md`](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/ANCHORING.md).
+On-chain anchoring is preserved under `apps/anchor-worker` but not wired into the default product
+flow. Status, env vars, how to run the worker, and troubleshooting are in
+[apps/anchor-worker/README.md](apps/anchor-worker/README.md).
 
 ## Prerequisites
 
@@ -253,9 +244,6 @@ Important environment values to set for the current architecture:
 
 - `HELIUS_WEBHOOK_ID` lets the server add and remove agent wallets from the existing Helius webhook.
 - `OLLAMA_API_KEY` and `OLLAMA_MODEL` are required when `LLM_PROVIDER=ollama`.
-
-If you are experimenting with the decoupled anchor worker manually, it still uses
-`MORTEM_SIGNER_SECRET_KEY`. That variable is not required for the normal app flow.
 
 ## Install
 
@@ -395,15 +383,6 @@ optional logger instead of interrupting the agent.
 If you use the onboarding wizard, it pre-fills the exact `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, and
 `MORTEM_VERIFY_TOKEN` values for you and keeps polling until the first trace is received.
 
-## Anchor Worker
-
-The anchor worker is preserved for future use but not connected to the live product flow.
-
-If you want to inspect or revive it:
-
-- entrypoint: [apps/anchor-worker/src/index.ts](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/src/index.ts)
-- re-enable guide: [apps/anchor-worker/ANCHORING.md](/Users/sam/Projects/mortem-protocol/apps/anchor-worker/ANCHORING.md)
-
 ## Common Scripts
 
 Root scripts:
@@ -454,7 +433,7 @@ corepack pnpm test
 - Rotate agent API keys from the dashboard if a key leaks.
 - Ollama costs are tracked as externally billed usage, so the dashboard shows "tracked by Ollama" instead of a USD estimate.
 - The server verifies Privy JWTs with `verifyAuthToken` only.
-- The anchor worker is currently decoupled and is not part of the default build, dev, test, or typecheck pipeline.
+- Anchor worker: decoupled from the default pipeline; see [apps/anchor-worker/README.md](apps/anchor-worker/README.md).
 
 ## Troubleshooting
 
@@ -486,15 +465,7 @@ For Ollama billing, check https://ollama.com/settings/usage.
 For Anthropic, make sure ANTHROPIC_API_KEY is set.
 ```
 
-If you are trying to use the preserved anchor worker:
-
-```text
-Read apps/anchor-worker/ANCHORING.md first.
-Confirm HELIUS_RPC_URL.
-Confirm MORTEM_SIGNER_SECRET_KEY is funded and valid.
-Confirm the signer wallet has enough lamports for transaction fees.
-Restore the ingest/server/dashboard connections before expecting new traces to reach it.
-```
+Anchor worker: [apps/anchor-worker/README.md](apps/anchor-worker/README.md).
 
 ## License
 
