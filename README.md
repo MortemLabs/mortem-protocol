@@ -127,9 +127,11 @@ live product surface.
 The primary first-run path is `/app/agents/new`, a four-step onboarding wizard:
 
 1. Create the agent and reveal the plaintext API key one time.
-2. Install `@mortemlabs/sdk` with prefilled environment values.
+2. Install `@mortemlabs/sdk` with prefilled environment values, including the one-time
+   `MORTEM_VERIFY_TOKEN`.
 3. Copy a minimal integration snippet or an AI-assistant prompt with the real credentials.
-4. Poll for the first trace until the agent shows as connected and verified.
+4. Poll until the agent is both connected and verified. After verification, you can remove
+   `MORTEM_VERIFY_TOKEN` from the agent env and code.
 
 ### Database
 
@@ -244,6 +246,8 @@ Important environment values to set for the current architecture:
 
 - `HELIUS_WEBHOOK_ID` lets the server add and remove agent wallets from the existing Helius webhook.
 - `OLLAMA_API_KEY` and `OLLAMA_MODEL` are required when `LLM_PROVIDER=ollama`.
+- `MORTEM_INGEST_URL=http://localhost:4001` should be set in local agent projects. The SDK
+  default is `https://ingest.mortem.dev`, which is correct for hosted usage but not for local dev.
 
 ## Install
 
@@ -319,16 +323,28 @@ That starts the shared app pipeline and intentionally excludes `@mortemlabs/anch
 2. Sign in with Privy.
 3. Click `Add agent` or open `/app/agents/new`.
 4. Create an agent and copy the API key and verify token shown during onboarding. They are only shown once.
-5. Add `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, and the one-time `MORTEM_VERIFY_TOKEN` to your agent.
-6. Run the agent once so the wizard can detect the first trace.
-7. Open the agent detail page to watch live traces.
-8. Open a trace detail page to inspect events, analysis, and sharing state.
+5. Add `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, `MORTEM_VERIFY_TOKEN`, and `MORTEM_INGEST_URL` to
+   your agent.
+6. Run the agent once so the wizard can detect the first trace and verify ownership.
+7. After the wizard shows the agent as verified, remove `MORTEM_VERIFY_TOKEN` from the agent env
+   and code.
+8. Open the agent detail page to watch live traces.
+9. Open a trace detail page to inspect events, analysis, and sharing state.
 
 ## Using The SDK
 
 Install the SDK package in an agent project, or import it from this workspace while developing.
 
-Basic manual instrumentation:
+Recommended local env:
+
+```bash
+MORTEM_API_KEY=...
+MORTEM_AGENT_ID=...
+MORTEM_VERIFY_TOKEN=... # remove after verification
+MORTEM_INGEST_URL=http://localhost:4001
+```
+
+Recommended session pattern:
 
 ```ts
 import { Mortem } from "@mortemlabs/sdk"
@@ -347,18 +363,23 @@ const session = await mortem.startSession({
 })
 
 try {
-  const planning = session.beginEvent("custom", {
-    step: "planning",
-  })
-
-  planning.complete({
-    payload: {
+  const result = await session.run(async () => {
+    const planning = session.beginEvent("custom", {
       step: "planning",
-      result: "ready",
-    },
+    })
+
+    planning.complete({
+      payload: {
+        step: "planning",
+        result: "ready",
+      },
+    })
+
+    return { ok: true }
   })
 
   await session.complete("Agent completed successfully")
+  console.log(session.traceId, result.ok)
 } catch (error) {
   await session.fail(error)
 } finally {
@@ -366,7 +387,12 @@ try {
 }
 ```
 
-Provider wrappers:
+Why `session.run(...)` matters:
+
+- It keeps Mortem's async trace context active while your agent performs work.
+- Without it, you can create a top-level trace but still miss child LLM, tool, or Solana events.
+
+Common wrappers:
 
 ```ts
 const openai = mortem.wrapOpenAI(openaiClient)
@@ -377,11 +403,48 @@ const model = mortem.wrapLanguageModel(vercelAiModel)
 const connection = mortem.wrapConnection(solanaConnection)
 ```
 
+Typical Vercel AI SDK integration:
+
+```ts
+const tracedTools = mortem.wrapTools(tools)
+const tracedModel = mortem.wrapLanguageModel(model)
+
+const session = await mortem.startSession({
+  inputSummary: "Research a token and summarize the trade",
+})
+
+try {
+  const result = await session.run(async () => {
+    return generateText({
+      model: tracedModel,
+      tools: tracedTools,
+      maxSteps: 5,
+      prompt: "Should I swap 1 SOL for JUP right now?",
+    })
+  })
+
+  await session.complete(result.text)
+} catch (error) {
+  await session.fail(error)
+} finally {
+  await mortem.close()
+}
+```
+
+Important SDK notes:
+
+- `verifyToken` is sent only once, on the first flush after init.
+- `session.traceId` is an alias for `session.id`.
+- The SDK does not create public share links. Build dashboard URLs yourself from the trace id if
+  you want to print a local trace URL.
+- The default ingest URL is `https://ingest.mortem.dev`. Override it in local development.
+
 The SDK is designed to be best effort. Buffer flush errors are swallowed and reported through the
 optional logger instead of interrupting the agent.
 
 If you use the onboarding wizard, it pre-fills the exact `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, and
-`MORTEM_VERIFY_TOKEN` values for you and keeps polling until the first trace is received.
+`MORTEM_VERIFY_TOKEN` values for you and keeps polling until the first trace is received and the
+agent is verified.
 
 ## Common Scripts
 
@@ -458,7 +521,9 @@ Check the ingest health endpoint at /healthz.
 If analysis never appears:
 
 ```text
-Run the analysis worker.
+Run the analysis worker in a separate terminal: corepack pnpm --filter @mortemlabs/server worker:analysis
+Restart the worker after pulling changes to analysis logic.
+Confirm the trace status is completed. Analysis does not run for traces still marked running.
 Check analysis:pending in Redis.
 For Ollama, make sure OLLAMA_API_KEY is set. Get one at https://ollama.com/settings/keys.
 For Ollama billing, check https://ollama.com/settings/usage.
