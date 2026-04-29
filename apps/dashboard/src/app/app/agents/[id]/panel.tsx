@@ -107,26 +107,29 @@ function AgentDetailFrame({
         </Button>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="border border-line bg-ink-2 p-6 text-card-foreground">
+            <p className="eyebrow">Agent dossier</p>
+            <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-semibold tracking-normal">{agent.displayName}</h1>
+                  <h1 className="font-display text-4xl leading-tight tracking-tight">
+                    {agent.displayName}
+                  </h1>
                   <Badge variant={agent.privateMode ? "secondary" : "outline"}>
                     {agent.privateMode ? "private" : "shared"}
                   </Badge>
                   {!agent.verified ? <Badge variant="warning">Unverified</Badge> : null}
                   {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
                 </div>
-                <p className="mt-3 font-mono text-xs tabular-nums text-muted-foreground">
+                <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
                   {agent.id}
                 </p>
                 {!agent.verified ? (
                   <Link
                     href={`/app/agents/new?agentId=${agent.id}`}
-                    className="mt-3 inline-flex text-sm font-medium text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
+                    className="mt-3 inline-flex font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-signal underline-offset-4 hover:underline"
                   >
-                    Complete setup -&gt;
+                    Complete setup &rarr;
                   </Link>
                 ) : null}
               </div>
@@ -397,14 +400,14 @@ function LiveStreamFrame({
   setFollow: (value: boolean) => void
 }>) {
   return (
-    <aside className="border border-border bg-card p-5 text-card-foreground shadow-sm">
+    <aside className="border border-line bg-ink-2 p-5 text-card-foreground">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Radio className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <h2 className="font-medium tracking-normal">Live stream</h2>
+          <Radio className="h-4 w-4 text-signal" aria-hidden="true" />
+          <h2 className="font-display text-xl leading-none">Live stream</h2>
         </div>
         <Badge variant={connected ? "success" : "warning"}>
-          {connected ? "SSE ready" : "connecting"}
+          {connected ? "Pulse" : "Flatline"}
         </Badge>
       </div>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -418,7 +421,7 @@ function LiveStreamFrame({
           value={filter}
           onChange={(event) => setFilter(event.currentTarget.value)}
           placeholder="Filter live traces"
-          className="min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="min-h-10 min-w-0 flex-1 border-b border-line bg-transparent px-3 font-mono text-xs uppercase tracking-[0.12em] focus-visible:outline-none focus-visible:border-signal"
         />
         <Button
           type="button"
@@ -429,26 +432,26 @@ function LiveStreamFrame({
         </Button>
       </div>
 
-      <div className="mt-3 rounded-md border border-border bg-background p-3 text-xs text-muted-foreground">
+      <div className="mt-3 border border-line bg-ink p-3 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
         j/k move · space toggles follow · / focuses filter
       </div>
       {error === null ? null : (
-        <div className="mt-3 rounded-md border border-amber-600/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
+        <div className="mt-3 border border-signal bg-transparent p-3 text-sm text-signal">
           {error}
         </div>
       )}
 
       <div className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1">
         {rows.length === 0 ? (
-          <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-            Waiting for session.
+          <div className="border border-line p-3 text-sm text-muted-foreground">
+            Measuring pulse&hellip;
           </div>
         ) : (
           rows.map((row, index) => (
             <Link
               key={row.id}
               href={`/app/traces/${row.id}`}
-              className="block rounded-md border border-border p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[focused=true]:border-primary"
+              className="block border border-line p-3 transition-colors hover:bg-ink-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[focused=true]:border-signal"
               data-focused={index === focusedIndex}
               onFocus={() => setFocusedIndex(index)}
             >
@@ -604,22 +607,22 @@ function AgentDetailSkeleton() {
       aria-busy="true"
     >
       <div className="mx-auto max-w-7xl">
-        <div className="h-10 w-28 rounded-md bg-muted" />
+        <div className="h-10 w-28 bg-ink-3" />
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-h-64 border border-border bg-card p-6 shadow-sm">
-            <div className="h-8 w-64 rounded-md bg-muted" />
-            <div className="mt-4 h-4 w-44 rounded-md bg-muted" />
+          <div className="min-h-64 border border-line bg-ink-2 p-6">
+            <div className="h-8 w-64 bg-ink-3" />
+            <div className="mt-4 h-4 w-44 bg-ink-3" />
             <div className="mt-8 grid gap-3 md:grid-cols-3">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="h-24 rounded-md bg-muted" />
+                <div key={item} className="h-24 bg-ink-3" />
               ))}
             </div>
           </div>
-          <div className="min-h-64 border border-border bg-card p-5 shadow-sm">
-            <div className="h-5 w-32 rounded-md bg-muted" />
+          <div className="min-h-64 border border-line bg-ink-2 p-5">
+            <div className="h-5 w-32 bg-ink-3" />
             <div className="mt-5 space-y-3">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="h-10 rounded-md bg-muted" />
+                <div key={item} className="h-10 bg-ink-3" />
               ))}
             </div>
           </div>
@@ -642,9 +645,9 @@ function AgentMessage({
 }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {actionLabel === undefined || onAction === undefined ? null : (
@@ -663,8 +666,8 @@ function AgentMessage({
 
 function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="border border-border p-4">
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
+    <div className="border border-line p-4">
+      <p className="eyebrow">{label}</p>
       <p className="mt-2 break-all font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
