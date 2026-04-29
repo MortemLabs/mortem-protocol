@@ -360,9 +360,10 @@ function TraceMetadataPanel({
   trace: TraceDetailView
 }>) {
   return (
-    <aside className="border border-border bg-card text-card-foreground shadow-sm xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto">
-      <div className="border-b border-border p-4">
-        <div className="flex flex-wrap items-center gap-2">
+    <aside className="border border-line bg-ink-2 text-card-foreground xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto">
+      <div className="border-b border-line p-4">
+        <p className="eyebrow">Dossier</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
           {trace.tags.map((tag) => (
             <Badge key={tag} variant="outline">
@@ -370,11 +371,13 @@ function TraceMetadataPanel({
             </Badge>
           ))}
         </div>
-        <h1 className="mt-3 text-2xl font-semibold tracking-normal">{trace.inputSummary}</h1>
-        <p className="mt-2 font-mono text-xs text-muted-foreground">{trace.id}</p>
+        <h1 className="mt-3 font-display text-2xl leading-tight">{trace.inputSummary}</h1>
+        <p className="mt-2 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
+          {trace.id}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-px bg-border">
+      <div className="grid grid-cols-2 gap-px bg-line">
         <TraceStat label="Duration" value={formatDuration(trace.durationMs)} />
         <TraceStat label="Events" value={String(trace.eventCount)} />
         <TraceStat label="Tokens" value={String(trace.totalTokens)} />
@@ -382,8 +385,8 @@ function TraceMetadataPanel({
         <TraceStat label="Lamports" value={trace.totalLamports} />
         <TraceStat label="Txs" value={String(trace.solanaTxCount)} />
       </div>
-      <section className="border-b border-border p-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-normal">
+      <section className="border-b border-line p-4">
+        <h2 className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em]">
           <Share2 className="h-4 w-4" aria-hidden="true" />
           Share controls
         </h2>
@@ -393,8 +396,8 @@ function TraceMetadataPanel({
               Create a read-only public link for this trace.
             </p>
           ) : (
-            <div className="rounded-md border border-border bg-background p-3">
-              <p className="text-xs font-medium text-muted-foreground">Public link</p>
+            <div className="border border-line bg-ink p-3">
+              <p className="eyebrow">Public link</p>
               <Link className="mt-1 block break-all font-mono text-xs underline" href={shareUrl}>
                 {shareUrl}
               </Link>
@@ -439,12 +442,12 @@ function TraceTimelinePanel({
   trace: TraceDetailView
 }>) {
   return (
-    <section className="min-w-0 border border-border bg-card text-card-foreground shadow-sm">
-      <div className="border-b border-border p-4">
+    <section className="min-w-0 border border-line bg-ink-2 text-card-foreground">
+      <div className="border-b border-line p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Timeline</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-normal">Chronological events</h2>
+            <p className="eyebrow">06 · Timeline</p>
+            <h2 className="mt-2 font-display text-2xl leading-tight">Event chronology</h2>
           </div>
           <Badge variant="outline">{formatDate(trace.startedAt)}</Badge>
         </div>
@@ -526,7 +529,7 @@ function TraceInspectorPanel({
 }: Readonly<{ event: TraceEventView | null; trace: TraceDetailView }>) {
   if (event === null) {
     return (
-      <aside className="border border-border bg-card p-4 text-card-foreground shadow-sm">
+      <aside className="border border-border bg-card p-4 text-card-foreground">
         <h2 className="text-xl font-semibold tracking-normal">Context inspector</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           No events were captured for this trace.
@@ -538,10 +541,10 @@ function TraceInspectorPanel({
   const markdown = buildEventMarkdown(trace, event)
 
   return (
-    <aside className="min-w-0 border border-border bg-card text-card-foreground shadow-sm xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto">
-      <div className="border-b border-border p-4">
-        <p className="text-sm font-medium text-muted-foreground">Context inspector</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-normal">{eventHeadline(event)}</h2>
+    <aside className="min-w-0 border border-line bg-ink-2 text-card-foreground xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto">
+      <div className="border-b border-line p-4">
+        <p className="eyebrow">Inspector</p>
+        <h2 className="mt-2 font-display text-2xl leading-tight">{eventHeadline(event)}</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <CopyButton label="Copy as markdown" value={markdown} />
           <Badge variant={event.payloadEncrypted ? "warning" : "outline"}>
@@ -550,7 +553,7 @@ function TraceInspectorPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-px bg-border">
+      <div className="grid grid-cols-2 gap-px bg-line">
         <TraceStat label="Type" value={event.type} />
         <TraceStat label="Sequence" value={String(event.sequence)} />
         <TraceStat label="Started" value={formatTime(event.startedAt)} />
@@ -558,8 +561,8 @@ function TraceInspectorPanel({
       </div>
 
       <section className="p-4">
-        <h3 className="text-sm font-semibold tracking-normal">Payload</h3>
-        <pre className="mt-3 max-h-[560px] overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5">
+        <h3 className="eyebrow">Payload</h3>
+        <pre className="mt-3 max-h-[560px] overflow-auto border border-line bg-ink p-3 text-xs leading-5">
           {formatJson(event.payload)}
         </pre>
       </section>
@@ -571,9 +574,9 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
   if (analysis === null) {
     return (
       <section className="p-4">
-        <h2 className="text-sm font-semibold tracking-normal">AI Analysis</h2>
+        <h2 className="eyebrow">Autopsy</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Analysis is queued once the trace completes.
+          Autopsy is queued once the trace completes.
         </p>
       </section>
     )
@@ -582,19 +585,19 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
   return (
     <section className="p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold tracking-normal">AI Analysis</h2>
+        <h2 className="eyebrow">Autopsy</h2>
         <Badge variant={failureVariant(analysis.failureType)}>
           {failureLabel(analysis.failureType)}
         </Badge>
       </div>
       <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
           <span>Confidence</span>
           <span>{Math.round(analysis.confidence * 100)}%</span>
         </div>
-        <div className="mt-2 h-2 rounded-sm bg-muted">
+        <div className="mt-2 h-2 bg-ink-3">
           <div
-            className="h-2 rounded-sm bg-primary"
+            className="h-2 bg-signal"
             style={{ width: `${Math.min(100, Math.max(0, analysis.confidence * 100))}%` }}
           />
         </div>
@@ -611,7 +614,7 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
         {analysis.counterfactuals.map((item, index) => (
           <details
             key={`${item.question}-${index}`}
-            className="rounded-md border border-border p-3"
+            className="border border-line p-3"
           >
             <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               {item.question}
@@ -639,14 +642,14 @@ function TraceDetailSkeleton() {
       aria-busy="true"
     >
       <div className="mx-auto max-w-[1800px]">
-        <div className="h-10 w-28 rounded-md bg-muted" />
+        <div className="h-10 w-28 bg-ink-3" />
         <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
           {[0, 1, 2].map((panel) => (
-            <section key={panel} className="border border-border bg-card p-4 shadow-sm">
-              <div className="h-6 w-40 rounded-md bg-muted" />
+            <section key={panel} className="border border-line bg-ink-2 p-4">
+              <div className="h-6 w-40 bg-ink-3" />
               <div className="mt-6 space-y-3">
                 {[0, 1, 2, 3].map((row) => (
-                  <div key={row} className="h-12 rounded-md bg-muted" />
+                  <div key={row} className="h-12 bg-ink-3" />
                 ))}
               </div>
             </section>
@@ -670,9 +673,9 @@ function TraceDetailMessage({
 }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {actionLabel === undefined || onAction === undefined ? null : (
@@ -715,8 +718,8 @@ function CopyButton({ label, value }: Readonly<{ label: string; value: string }>
 
 function TraceStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
-    <div className="bg-card p-3">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <div className="bg-ink-2 p-3">
+      <p className="eyebrow">{label}</p>
       <p className="mt-1 break-words font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
@@ -725,7 +728,7 @@ function TraceStat({ label, value }: Readonly<{ label: string; value: ReactNode 
 function TraceDetailRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="py-1">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="eyebrow">{label}</p>
       <p className="mt-1 break-words font-mono text-xs tabular-nums">{value}</p>
     </div>
   )
@@ -734,9 +737,7 @@ function TraceDetailRow({ label, value }: Readonly<{ label: string; value: strin
 function AnalysisBlock({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-        {label}
-      </h3>
+      <h3 className="eyebrow">{label}</h3>
       <p className="mt-1">{value}</p>
     </div>
   )

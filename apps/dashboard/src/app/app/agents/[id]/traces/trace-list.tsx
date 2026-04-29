@@ -145,7 +145,7 @@ function TraceListFrame({
           </Link>
         </Button>
 
-        <section className="mt-6 border border-border bg-card text-card-foreground shadow-sm">
+        <section className="mt-6 border border-border bg-card text-card-foreground">
           <div className="flex flex-col gap-4 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Trace history</p>
@@ -158,7 +158,7 @@ function TraceListFrame({
                 <button
                   key={item}
                   type="button"
-                  className="inline-flex min-h-10 items-center rounded-md border border-border px-3 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+                  className="inline-flex min-h-10 items-center border border-border px-3 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
                   data-active={status === item}
                   onClick={() => setStatus(item)}
                 >
@@ -233,8 +233,8 @@ function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
       aria-busy="true"
     >
       <div className="mx-auto max-w-7xl">
-        <div className="h-10 w-28 rounded-md bg-muted" />
-        <section className="mt-6 border border-border bg-card p-4 shadow-sm">
+        <div className="h-10 w-28 bg-ink-3" />
+        <section className="mt-6 border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Filter className="h-4 w-4" aria-hidden="true" />
             Loading traces for {agentId}
@@ -246,12 +246,12 @@ function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
                 className="grid gap-4 border-t border-border pt-4 lg:grid-cols-[minmax(0,1fr)_120px_120px_120px]"
               >
                 <div className="space-y-3">
-                  <div className="h-5 w-56 rounded-md bg-muted" />
-                  <div className="h-4 w-full max-w-xl rounded-md bg-muted" />
+                  <div className="h-5 w-56 bg-ink-3" />
+                  <div className="h-4 w-full max-w-xl bg-ink-3" />
                 </div>
-                <div className="h-10 rounded-md bg-muted" />
-                <div className="h-10 rounded-md bg-muted" />
-                <div className="h-10 rounded-md bg-muted" />
+                <div className="h-10 bg-ink-3" />
+                <div className="h-10 bg-ink-3" />
+                <div className="h-10 bg-ink-3" />
               </div>
             ))}
           </div>
@@ -276,7 +276,7 @@ function TraceMessage({
 }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground shadow-sm">
+      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>

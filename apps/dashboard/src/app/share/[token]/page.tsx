@@ -39,6 +39,7 @@ export default async function SharePage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <div className="tape h-2 w-full" aria-hidden="true" />
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 lg:px-8">
         <Button asChild variant="ghost">
           <Link href="/">
@@ -47,22 +48,30 @@ export default async function SharePage({
           </Link>
         </Button>
 
-        <section className="mt-6 border border-border bg-card p-6 text-card-foreground shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <section className="mt-6 border border-line bg-ink-2 text-card-foreground">
+          <div className="flex items-center justify-between border-b border-line px-6 py-3">
+            <p className="case-meta">04 · Public autopsy</p>
+            <span className="death-stamp">Filed</span>
+          </div>
+          <div className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={statusVariant(data.status)}>{data.status}</Badge>
               </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-normal">{data.inputSummary}</h1>
-              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{data.id}</p>
+              <h1 className="mt-3 font-display text-4xl leading-[1.05] tracking-tight">
+                {data.inputSummary}
+              </h1>
+              <p className="mt-3 break-all font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                {data.id}
+              </p>
             </div>
-            <div className="rounded-md border border-border bg-background p-3">
-              <p className="text-xs font-medium text-muted-foreground">Started</p>
+            <div className="border border-line bg-ink p-3">
+              <p className="eyebrow">Established</p>
               <p className="mt-1 font-mono text-xs">{formatDate(data.startedAt)}</p>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-4">
+          <div className="grid gap-px bg-line md:grid-cols-4">
             <ShareStat label="Events" value={String(data.eventCount)} />
             <ShareStat label="Tokens" value={String(data.totalTokens)} />
             <ShareStat label="Cost" value={formatCost(data.totalCostUsd.toString())} />
@@ -71,11 +80,12 @@ export default async function SharePage({
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="border border-border bg-card p-5 text-card-foreground shadow-sm">
-            <h2 className="text-xl font-semibold tracking-normal">AI Analysis</h2>
+          <aside className="border border-line bg-ink-2 p-5 text-card-foreground">
+            <p className="eyebrow">Autopsy</p>
+            <h2 className="mt-2 font-display text-2xl leading-tight">Cause of death</h2>
             {data.analysis === null ? (
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                Analysis has not been written for this trace.
+                Autopsy has not been written for this trace.
               </p>
             ) : (
               <div className="mt-4 space-y-3 text-sm leading-6">
@@ -88,14 +98,15 @@ export default async function SharePage({
             )}
           </aside>
 
-          <section className="border border-border bg-card text-card-foreground shadow-sm">
-            <div className="border-b border-border p-5">
-              <h2 className="text-xl font-semibold tracking-normal">Event timeline</h2>
+          <section className="border border-line bg-ink-2 text-card-foreground">
+            <div className="border-b border-line p-5">
+              <p className="eyebrow">05 · Timeline</p>
+              <h2 className="mt-2 font-display text-2xl leading-tight">Event chronology</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 Ordered events captured by the Mortem SDK.
               </p>
             </div>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-line">
               {data.events.length === 0 ? (
                 <div className="p-5 text-sm text-muted-foreground">No events were shared.</div>
               ) : (
@@ -120,9 +131,9 @@ async function getSharedTrace(token: string): Promise<ShareResult> {
 function ShareMessage({ token }: Readonly<{ token: string }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">Shared trace not found.</h1>
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">Shared trace buried</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           The link may have been disabled or the token may be wrong.
         </p>
@@ -148,7 +159,7 @@ function SharedEventRow({ event }: Readonly<{ event: SharedEvent }>) {
           </p>
         </div>
       </summary>
-      <pre className="mt-4 max-h-96 overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5">
+      <pre className="mt-4 max-h-96 overflow-auto border border-line bg-ink p-3 text-xs leading-5">
         {formatJson(event.payload)}
       </pre>
     </details>
@@ -157,9 +168,9 @@ function SharedEventRow({ event }: Readonly<{ event: SharedEvent }>) {
 
 function ShareStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
-    <div className="rounded-md border border-border bg-background p-3">
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
-      <p className="mt-2 break-all font-mono text-sm">{value}</p>
+    <div className="bg-ink-2 p-4">
+      <p className="eyebrow">{label}</p>
+      <p className="mt-2 break-all font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
 }
