@@ -14,8 +14,10 @@ export default function AppHomePage() {
             href="/app"
             className="inline-flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Mark size={28} />
-            <span className="font-display text-lg leading-none">Mortem.</span>
+            <Mark size={32} alt="Mortem" className="-pl-0.5 -mr-1.5"/>
+      <span className="font-display text-3xl leading-none">
+        Mortem<span className="pl-0.5 text-[#DC2626] text-4xl">.</span>
+      </span>
           </Link>
           <nav className="flex items-center gap-2 text-sm" aria-label="Workspace">
             <Button asChild>
