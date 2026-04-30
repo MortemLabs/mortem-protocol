@@ -1,6 +1,6 @@
 {
   "name": "@mortemlabs/shared",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Shared types, schemas, and verification utilities for Mortem.",
   "type": "module",
   "publishConfig": {
