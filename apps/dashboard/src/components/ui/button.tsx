@@ -1,12 +1,12 @@
 import { cn } from "@/lib/utils"
-// The shared button follows shadcn conventions with token-based variants and accessible focus states.
-// Use this primitive for every click target that behaves like a button or button-styled link.
+// Brutal square buttons per Mortem brand. Mono uppercase by default — the body
+// is sans, but click targets read as case-file labels.
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps, cva } from "class-variance-authority"
 import type * as React from "react"
 
 const buttonVariants = cva(
-  "inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium tracking-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-none font-mono text-[0.6875rem] font-medium uppercase tracking-[0.16em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50",
   {
     defaultVariants: {
       size: "default",
@@ -14,17 +14,17 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
-        default: "h-10 px-4 py-2",
+        default: "h-10 px-4",
         icon: "h-10 w-10",
-        lg: "h-11 px-5 py-2",
-        sm: "h-9 px-3",
+        lg: "h-12 px-6",
+        sm: "h-8 px-3",
       },
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default: "bg-signal text-paper hover:brightness-110",
+        destructive: "bg-signal text-paper hover:brightness-110",
+        ghost: "text-foreground hover:bg-ink-3",
+        outline: "border border-line bg-transparent text-foreground hover:bg-ink-3",
+        secondary: "border border-line bg-ink-2 text-paper hover:bg-ink-3",
       },
     },
   },

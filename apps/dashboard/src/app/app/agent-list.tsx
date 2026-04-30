@@ -68,13 +68,13 @@ function AuthenticatedAgentList() {
 
   if (!authenticated) {
     return (
-      <section className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">
+      <section className="border border-line bg-ink-2 p-6 text-card-foreground">
+        <div className="flex h-12 w-12 items-center justify-center border border-line">
           <Activity className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         </div>
-        <h2 className="mt-5 text-xl font-semibold tracking-normal">Sign in to load agents.</h2>
+        <h2 className="mt-5 font-display text-2xl leading-tight">Sign in to load agents</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-          Mortem uses your Privy JWT to check agent ownership before returning traces, keys, or live
+          Mortem checks your Privy JWT for agent ownership before returning traces, keys, or live
           streams.
         </p>
         <Button type="button" className="mt-6" onClick={() => login()}>
@@ -90,15 +90,15 @@ function AuthenticatedAgentList() {
 
   if (agents.isError) {
     return (
-      <section className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">
-          <AlertCircle className="h-5 w-5 text-destructive" aria-hidden="true" />
+      <section className="border border-line bg-ink-2 p-6 text-card-foreground">
+        <div className="flex h-12 w-12 items-center justify-center border border-signal">
+          <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
         </div>
-        <h2 className="mt-5 text-xl font-semibold tracking-normal">Agents did not load.</h2>
+        <h2 className="mt-5 font-display text-2xl leading-tight">Cause of death: load failure</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Check the server app, refresh the request, or sign in again if the session expired.
         </p>
-        <Button type="button" className="mt-6" variant="secondary" onClick={() => agents.refetch()}>
+        <Button type="button" className="mt-6" variant="outline" onClick={() => agents.refetch()}>
           <RefreshCcw className="h-4 w-4" aria-hidden="true" />
           Retry
         </Button>
@@ -127,34 +127,34 @@ function AgentListFrame({
   description,
 }: Readonly<{ agents: PreviewAgent[]; banner: string; description: string }>) {
   return (
-    <section className="border border-border bg-card text-card-foreground shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="border border-line bg-ink-2 text-card-foreground">
+      <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{banner}</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-normal">Agent registry</h2>
+          <p className="eyebrow">02 · {banner}</p>
+          <h2 className="mt-2 font-display text-2xl leading-tight">Agent registry</h2>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild>
             <Link href="/app/agents/new">
               <Plus className="h-4 w-4" aria-hidden="true" />
-              Add agent
+              File new agent
             </Link>
           </Button>
         </div>
       </div>
 
-      <div className="divide-y divide-border">
+      <div className="divide-y divide-line">
         {agents.map((agent) => (
           <div
             key={agent.id}
-            className="grid min-h-24 gap-3 p-4 transition-colors hover:bg-accent md:grid-cols-[minmax(0,1fr)_160px_160px]"
+            className="grid min-h-24 gap-3 p-4 transition-colors hover:bg-ink-3 md:grid-cols-[minmax(0,1fr)_160px_160px]"
           >
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/app/agents/${agent.id}`}
-                  className="font-medium tracking-normal hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="font-display text-lg leading-none hover:text-signal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {agent.displayName}
                 </Link>
@@ -169,9 +169,9 @@ function AgentListFrame({
               {!agent.verified ? (
                 <Link
                   href={`/app/agents/new?agentId=${agent.id}`}
-                  className="mt-2 inline-flex text-sm font-medium text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
+                  className="mt-2 inline-flex font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-signal underline-offset-4 hover:underline"
                 >
-                  Complete setup -&gt;
+                  Complete setup &rarr;
                 </Link>
               ) : null}
             </div>
@@ -186,19 +186,19 @@ function AgentListFrame({
 
 function EmptyAgentList() {
   return (
-    <section className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">
+    <section className="border border-line bg-ink-2 p-6 text-card-foreground">
+      <div className="flex h-12 w-12 items-center justify-center border border-line">
         <Database className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
       </div>
-      <h2 className="mt-5 text-xl font-semibold tracking-normal">No agents yet.</h2>
+      <h2 className="stamp mt-5 font-display text-2xl leading-tight">Empty registry</h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-        Create an agent to receive an API key, start sessions from the SDK, and anchor completed
+        File an agent to receive an API key, start sessions from the SDK, and anchor completed
         traces with Solana memo transactions.
       </p>
       <Button asChild className="mt-6">
         <Link href="/app/agents/new">
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Add agent
+          File new agent
         </Link>
       </Button>
     </section>
@@ -207,23 +207,20 @@ function EmptyAgentList() {
 
 function AgentListSkeleton() {
   return (
-    <section
-      className="border border-border bg-card p-4 text-card-foreground shadow-sm"
-      aria-busy="true"
-    >
-      <div className="h-5 w-32 rounded-md bg-muted" />
+    <section className="border border-line bg-ink-2 p-4 text-card-foreground" aria-busy="true">
+      <div className="h-5 w-32 bg-ink-3" />
       <div className="mt-5 space-y-3">
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className="grid min-h-24 gap-3 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_160px_160px]"
+            className="grid min-h-24 gap-3 border-t border-line pt-4 md:grid-cols-[minmax(0,1fr)_160px_160px]"
           >
             <div>
-              <div className="h-5 w-48 rounded-md bg-muted" />
-              <div className="mt-3 h-4 w-32 rounded-md bg-muted" />
+              <div className="h-5 w-48 bg-ink-3" />
+              <div className="mt-3 h-4 w-32 bg-ink-3" />
             </div>
-            <div className="h-10 rounded-md bg-muted" />
-            <div className="h-10 rounded-md bg-muted" />
+            <div className="h-10 bg-ink-3" />
+            <div className="h-10 bg-ink-3" />
           </div>
         ))}
       </div>
@@ -234,7 +231,7 @@ function AgentListSkeleton() {
 function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-baseline justify-between gap-4 md:block">
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
+      <p className="eyebrow">{label}</p>
       <p className="mt-1 font-mono text-sm tabular-nums">{value}</p>
     </div>
   )

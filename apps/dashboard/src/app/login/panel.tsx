@@ -12,21 +12,21 @@ export function LoginPanel() {
 
   if (!privyEnabled) {
     return (
-      <section className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">Privy setup</p>
-        <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-          Add a Privy app id to sign in.
+      <section className="border border-line bg-ink-2 p-6">
+        <p className="eyebrow">01 · Privy setup</p>
+        <h1 className="stamp mt-4 font-display text-3xl leading-tight">
+          Add a Privy app id to sign in
         </h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">
           Set NEXT_PUBLIC_PRIVY_APP_ID and restart the dashboard. Until then, the app renders in
           local preview mode.
         </p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
           <Button asChild>
             <Link href="/app">Preview workspace</Link>
           </Button>
-          <Button asChild variant="secondary">
-            <Link href="/">Back home</Link>
+          <Button asChild variant="outline">
+            <Link href="/">Back to file</Link>
           </Button>
         </div>
       </section>
@@ -41,29 +41,29 @@ function PrivyLoginPanel() {
   const email = user?.email?.address ?? "Connected account"
 
   return (
-    <section className="border border-border bg-card p-6 text-card-foreground shadow-sm">
-      <p className="text-sm font-medium text-muted-foreground">Secure dashboard access</p>
-      <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-        {authenticated ? "You are signed in." : "Sign in to inspect agent traces."}
+    <section className="border border-line bg-ink-2 p-6">
+      <p className="eyebrow">02 · Secure dashboard access</p>
+      <h1 className="stamp mt-4 font-display text-3xl leading-tight">
+        {authenticated ? "You are signed in" : "Sign in to inspect agent traces"}
       </h1>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+      <p className="mt-4 text-sm leading-6 text-muted-foreground">
         {authenticated
-          ? `${email} can open private agents and live streams`
-          : "login to Mortem."}
+          ? `${email} can open private agents and live streams.`
+          : "Login to Mortem. Every project gets a death certificate."}
       </p>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-7 flex flex-col gap-3 sm:flex-row">
         {authenticated ? (
           <>
             <Button asChild>
-              <Link href="/app">Open workspace</Link>
+              <Link href="/app">Open dossier</Link>
             </Button>
-            <Button type="button" variant="secondary" onClick={() => logout()}>
+            <Button type="button" variant="outline" onClick={() => logout()}>
               Sign out
             </Button>
           </>
         ) : (
           <Button type="button" disabled={!ready} onClick={() => login()}>
-            {ready ? "Sign in" : "Preparing sign in"}
+            {ready ? "Sign in" : "Preparing pulse"}
           </Button>
         )}
       </div>

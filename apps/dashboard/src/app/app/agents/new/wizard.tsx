@@ -315,7 +315,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               verify token proof to confirm the connection.
             </p>
             {mode === "preview" ? (
-              <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
+              <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal dark:text-signal">
                 Preview mode is enabled because Privy is not configured. The wizard uses sample
                 credentials instead of creating a real agent.
               </div>
@@ -343,7 +343,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       value={displayName}
                       onChange={(event) => setDisplayName(event.currentTarget.value)}
                       placeholder="yield-hunter-v2"
-                      className="mt-2 h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       autoComplete="off"
                       spellCheck={false}
                     />
@@ -371,7 +371,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4 text-sm text-emerald-900 dark:text-emerald-100">
+                  <div className="border border-line bg-ink-3 p-4 text-sm text-paper">
                     {hasVerifyCredentials
                       ? "Your agent is already created. Continue below to install the SDK and connect the first trace."
                       : "This agent is already created. Continue below to finish verification."}
@@ -423,7 +423,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}\nMORTEM_INGEST_URL=${ingestUrl}`}
                   />
                   {hasVerifyCredentials ? null : (
-                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal dark:text-signal">
                       The API key and verify token are only shown when the agent is first created.
                       If you already added them, continue to the verification step below.
                     </div>
@@ -457,7 +457,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
               {createdAgent === null ? (
                 <LockedStepBody />
               ) : integrationExample === null || assistantPrompt === null ? (
-                <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal dark:text-signal">
                   This agent is already past the install step. If the SDK is in place, continue to
                   the verification check below.
                 </div>
@@ -480,7 +480,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                           type="button"
                           onClick={() => setActiveIntegrationTab(tab.value)}
                           className={cn(
-                            "rounded-md border px-3 py-2 text-sm font-medium transition",
+                            "border px-3 py-2 text-sm font-medium transition",
                             activeIntegrationTab === tab.value
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
@@ -495,7 +495,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       language="typescript"
                       value={integrationExample.code}
                     />
-                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-black dark:text-black">
+                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-black dark:text-black">
                       The verify token proves you control this agent. You can remove it from your
                       code after Mortem confirms the connection.
                     </div>
@@ -509,7 +509,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     language="typescript"
                   />
 
-                  <div className="rounded-md border border-border bg-background">
+                  <div className="border border-border bg-background">
                     <button
                       type="button"
                       onClick={() => setIsAssistantPromptOpen((current) => !current)}
@@ -564,7 +564,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                 <LockedStepBody />
               ) : (
                 <div className="space-y-5">
-                  <div className="flex items-start gap-3 rounded-md border border-border bg-background p-4">
+                  <div className="flex items-start gap-3 border border-border bg-background p-4">
                     {isVerified ? (
                       <CheckCircle2
                         className="mt-0.5 h-5 w-5 text-emerald-600"
@@ -572,7 +572,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       />
                     ) : timedOut ? (
                       <span
-                        className="mt-1 h-3 w-3 rounded-full bg-muted-foreground"
+                        className="mt-1 h-3 w-3 rounded-full bg-ink-3-foreground"
                         aria-hidden="true"
                       />
                     ) : isWaitingForVerification ? (
@@ -612,15 +612,15 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                   </div>
 
                   {connectionCheck.error === null || mode === "preview" ? null : (
-                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal dark:text-signal">
                       The dashboard could not check the connection just now. Try another refresh in
                       a moment.
                     </div>
                   )}
 
                   {isVerified ? (
-                    <div className="rounded-md border border-emerald-600/30 bg-emerald-500/10 p-4">
-                      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                    <div className="border border-line bg-ink-3 p-4">
+                      <p className="text-sm font-medium text-paper">
                         Agent verified and connected.
                       </p>
                       {connectionState?.firstSeenAt === null ||
@@ -647,7 +647,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       </div>
                     </div>
                   ) : timedOut ? (
-                    <div className="rounded-md border border-border bg-muted/20 p-4">
+                    <div className="border border-border bg-ink-3/20 p-4">
                       <p className="text-sm font-medium text-foreground">
                         Troubleshooting checklist
                       </p>
@@ -677,17 +677,17 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       </div>
                     </div>
                   ) : isWaitingForVerification ? (
-                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-4">
-                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    <div className="border border-signal/60 bg-transparent p-4">
+                      <p className="text-sm font-medium text-signal dark:text-signal">
                         Agent reached Mortem - waiting for verify token...
                       </p>
                       {connectionState?.firstSeenAt === null ||
                       connectionState?.firstSeenAt === undefined ? null : (
-                        <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                        <p className="mt-2 text-sm text-signal dark:text-signal">
                           First trace received {formatDateTime(connectionState.firstSeenAt)}.
                         </p>
                       )}
-                      <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                      <p className="mt-2 text-sm text-signal dark:text-signal">
                         Make sure <code>MORTEM_VERIFY_TOKEN</code> is set in your env and run your
                         agent again.
                       </p>
@@ -746,7 +746,7 @@ function WizardStep({
             state === "active" &&
               "border-2 border-primary bg-background text-primary shadow-[0_0_0_4px_hsl(var(--background))]",
             state === "future" &&
-              "border border-border bg-muted text-muted-foreground shadow-[0_0_0_4px_hsl(var(--background))]",
+              "border border-border bg-ink-3 text-muted-foreground shadow-[0_0_0_4px_hsl(var(--background))]",
           )}
         >
           {state === "complete" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : number}
@@ -755,10 +755,10 @@ function WizardStep({
 
       <div
         className={cn(
-          "rounded-md border p-5",
-          state === "active" && "border-primary/30 bg-card shadow-sm",
-          state === "complete" && "border-border bg-card shadow-sm",
-          state === "future" && "border-border bg-muted/20 text-muted-foreground",
+          "border p-5",
+          state === "active" && "border-primary/30 bg-card",
+          state === "complete" && "border-border bg-card",
+          state === "future" && "border-border bg-ink-3/20 text-muted-foreground",
         )}
       >
         <div className="flex items-start justify-between gap-4">
@@ -797,7 +797,7 @@ function WizardStep({
 
 function LockedStepBody() {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
+    <div className="flex items-center gap-3 border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
       <Lock className="h-4 w-4" aria-hidden="true" />
       Complete the previous step to unlock this section.
     </div>
@@ -810,11 +810,11 @@ function CodeBlock({
   value,
 }: Readonly<{ label: string; language?: CodeLanguage; value: string }>) {
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
-      <div className="border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-3">
+    <div className="overflow-hidden border border-line bg-ink shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
+      <div className="border-b border-line bg-ink/95 px-4 py-3">
         <p className="text-sm font-medium text-zinc-200">{label}</p>
       </div>
-      <pre className="overflow-x-auto bg-zinc-900 px-4 py-4 text-sm leading-7 text-zinc-100">
+      <pre className="overflow-x-auto bg-ink px-4 py-4 text-sm leading-7 text-zinc-100">
         <code>{renderHighlightedCode(value, language)}</code>
       </pre>
     </div>
@@ -840,8 +840,8 @@ function CopyBlock({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-3">
+    <div className="overflow-hidden border border-line bg-ink shadow-[0_18px_40px_rgba(24,24,27,0.16)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-ink/95 px-4 py-3">
         <p className="text-sm font-medium text-zinc-200">{label}</p>
         <Button
           type="button"
@@ -851,7 +851,7 @@ function CopyBlock({
           className={cn(
             "border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 hover:text-zinc-50",
             copied &&
-              "border-emerald-500/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
+              "border-emerald-500/25 bg-ink-3 text-emerald-200 hover:bg-emerald-500/15",
           )}
         >
           {copied ? (
@@ -862,7 +862,7 @@ function CopyBlock({
           {copied ? "Copied" : copyLabel}
         </Button>
       </div>
-      <pre className="overflow-x-auto bg-zinc-900 px-4 py-4 text-sm leading-7 text-zinc-100">
+      <pre className="overflow-x-auto bg-ink px-4 py-4 text-sm leading-7 text-zinc-100">
         <code>{renderHighlightedCode(value, language)}</code>
       </pre>
     </div>
@@ -871,7 +871,7 @@ function CopyBlock({
 
 function SummaryGrid({ rows }: Readonly<{ rows: Array<[string, string]> }>) {
   return (
-    <div className="grid gap-3 rounded-md border border-border bg-background p-4">
+    <div className="grid gap-3 border border-border bg-background p-4">
       {rows.map(([label, value]) => (
         <div key={label}>
           <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
@@ -897,7 +897,7 @@ function WizardMessage({
 }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm">
+      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
@@ -990,10 +990,10 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'")) {
-            return "text-emerald-300"
+            return ""
           }
 
-          return "text-amber-200"
+          return "text-signal"
         },
       }
     case "dotenv":
@@ -1005,7 +1005,7 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'") || token.startsWith("<")) {
-            return "text-emerald-300"
+            return ""
           }
 
           return "text-sky-300"
@@ -1021,7 +1021,7 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'") || token.startsWith("`")) {
-            return "text-emerald-300"
+            return ""
           }
 
           if (token.startsWith("process.env.")) {
@@ -1036,7 +1036,7 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
             return "text-orange-200"
           }
 
-          return "text-amber-200"
+          return "text-signal"
         },
       }
     case "text":
@@ -1049,14 +1049,14 @@ function getHighlightPattern(language: CodeLanguage): Readonly<{
           }
 
           if (token.startsWith('"') || token.startsWith("'")) {
-            return "text-emerald-300"
+            return ""
           }
 
           if (/^[A-Z0-9_]+$/.test(token)) {
             return "text-sky-300"
           }
 
-          return "text-amber-200"
+          return "text-signal"
         },
       }
   }
