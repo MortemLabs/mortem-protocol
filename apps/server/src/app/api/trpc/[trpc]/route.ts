@@ -37,7 +37,7 @@ const withCors = (response: Response, request: Request): Response => {
   })
 }
 
-const handler = async (request: Request) =>
+const handler = async (request: Request): Promise<Response> =>
   withCors(
     await fetchRequestHandler({
       createContext: () => createTRPCContext(request),
@@ -48,7 +48,7 @@ const handler = async (request: Request) =>
     request,
   )
 
-const options = async (request: Request) =>
+const options = async (request: Request): Promise<Response> =>
   new Response(null, {
     headers: corsHeaders(request),
     status: 204,

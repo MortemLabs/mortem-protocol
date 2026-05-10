@@ -16,7 +16,7 @@ const toPrismaJson = (value: JsonValue): Prisma.InputJsonValue | typeof Prisma.J
   value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue)
 
 const persistBatch = async (batch: TraceBatchInput, agentId: string): Promise<void> => {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     for (const item of batch.items) {
       const { id, ...traceRest } = item.trace
       const traceData = {
