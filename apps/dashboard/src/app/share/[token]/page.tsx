@@ -110,7 +110,9 @@ export default async function SharePage({
               {data.events.length === 0 ? (
                 <div className="p-5 text-sm text-muted-foreground">No events were shared.</div>
               ) : (
-                data.events.map((event) => <SharedEventRow key={event.id} event={event} />)
+                data.events.map((event: SharedEvent) => (
+                  <SharedEventRow key={event.id} event={event} />
+                ))
               )}
             </div>
           </section>
