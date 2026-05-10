@@ -21,7 +21,7 @@
     "@solana/web3.js": "^1.95.8",
     "@trpc/server": "11.0.0",
     "@upstash/redis": "^1.35.5",
-    "next": "15.3.2",
+    "next": "15.3.8",
     "ollama": "^0.5.17",
     "react": "19.0.0",
     "react-dom": "19.0.0",

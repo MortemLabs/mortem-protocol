@@ -48,10 +48,10 @@ const handler = async (request: Request): Promise<Response> =>
     request,
   )
 
-const options = async (request: Request): Promise<Response> =>
+export const OPTIONS = async (request: Request): Promise<Response> =>
   new Response(null, {
     headers: corsHeaders(request),
     status: 204,
   })
 
-export { handler as GET, options as OPTIONS, handler as POST }
+export { handler as GET, handler as POST }
