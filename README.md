@@ -1,31 +1,41 @@
 # Mortem
 
-Mortem is an observability and debugging platform for TypeScript AI agents running on Solana.
+Mortem is being built to help Solana trading bot teams catch bad decisions, reconstruct exactly
+why they happened, and fix strategy code before the same loss repeats.
 
-It captures agent traces, LLM calls, tool calls, Solana transactions, and custom events. It stores
-those traces in Postgres, streams them live to a dashboard, and analyzes failures with an LLM.
+Today, this repository provides the foundation for that workflow: TypeScript agent instrumentation,
+trace ingestion, live replay, post-trade analysis, and shareable autopsies. The long-term product
+direction is real-time trade diagnosis and intervention; the current codebase is focused on
+capturing the evidence chain and turning failed runs into actionable debugging context.
 
 The project is a pnpm monorepo powered by Turborepo, strict TypeScript, Prisma, Fastify, Next.js,
 Privy, Upstash Redis, and a preserved-but-decoupled anchor worker for future on-chain experiments.
 
 ## What Mortem Does
 
-Mortem helps answer a few practical questions when an AI agent fails:
+Mortem is designed to answer the questions bot operators actually care about after a bad trade:
 
-- What did the agent see?
-- What did the agent call?
-- Which Solana transactions did it send?
-- What market context or tool output was available at the time?
-- Was the failure avoidable?
+- What did the agent decide, and in what order?
+- What tool output, market context, or onchain state did it rely on?
+- Which Solana transaction actually landed?
+- Which 2-3 moments mattered between the signal and the loss?
+- What should the operator change before the next run?
+
+Right now, the repo is strongest at retrospective diagnosis:
+
+- capture the full trace
+- replay the chronology
+- inspect the analysis
+- generate a fix suggestion or next debugging step
 
 The core flow is:
 
 ```text
-TypeScript agent
+TypeScript trading agent
   -> @mortemlabs/sdk
   -> ingest service
   -> Postgres traces and events
-  -> dashboard, live stream, analysis worker
+  -> dashboard, live replay, analysis worker, shared autopsy
 ```
 
 ## Repository Structure
@@ -60,13 +70,15 @@ It provides:
 - `Session` trace lifecycle
 - event builders for `llm_call`, `tool_call`, `solana_tx`, `x402_payment`, `mcp_call`, and `custom`
 - wrappers for OpenAI, Anthropic, Ollama, Vercel AI SDK tools/models, LangChain callbacks, and Solana connections
+- market-context helpers for Jupiter quotes and Pyth prices
 - gzip buffering with retries
 - best-effort behavior so SDK failures do not crash the agent
 - optional AES-256-GCM payload encryption with `MORTEM_MASTER_KEY`
 
 ### Ingest Service
 
-`apps/ingest` is a Fastify service. It accepts trace batches from the SDK.
+`apps/ingest` is a Fastify service. It accepts trace batches from the SDK and turns them into the
+stored evidence chain used by the dashboard and analysis worker.
 
 Main routes:
 
@@ -77,8 +89,8 @@ POST /v1/traces/:id/complete
 GET  /v1/agents/:id/live
 ```
 
-The batch route validates input with Zod, resolves API keys, rate limits by agent, writes traces and
-events through Prisma, pushes live updates to Redis, and queues completed traces for analysis.
+The batch route validates input with Zod, resolves API keys, rate limits by agent, writes traces
+and events through Prisma, pushes live updates to Redis, and queues completed traces for analysis.
 
 ### API Server
 
@@ -102,7 +114,7 @@ watchlist so that wallet enrichment stays in sync without hardcoding webhook set
 
 ### Dashboard
 
-`apps/dashboard` is the user interface.
+`apps/dashboard` is the user interface for agent onboarding, trace inspection, and shared autopsies.
 
 Routes:
 
@@ -123,6 +135,13 @@ The dashboard uses Privy for login, tRPC for application data, and SSE for live 
 Shared trace links remain available through `/share/[token]`, but the public page now shows only the
 trace, events, and analysis. The older cryptographic verification block is no longer part of the
 live product surface.
+
+The product story in the UI is now narrower than generic "observability":
+
+- show the decision sequence
+- show the market or execution context around it
+- identify what likely broke
+- help the operator decide what to change next
 
 The primary first-run path is `/app/agents/new`, a four-step onboarding wizard:
 
@@ -167,12 +186,16 @@ trace:{traceId}            Cached trace JSON
 For local development, some services have in-memory Redis fallbacks when Upstash credentials are not
 present. Postgres is still required for real app flows.
 
-### LLM Analysis
+### Analysis Worker
 
 The analysis worker lives in `apps/server/src/server/analysis-worker.ts`.
 
 It polls `analysis:pending`, fetches trace context from Postgres, calls the configured LLM provider,
 writes `TraceAnalysis`, and publishes `analysis:ready:{traceId}`.
+
+Today, analysis is asynchronous and post-trade. It is best understood as autopsy and diagnosis, not
+yet as full real-time intervention. The intended direction is to move closer to "catch the bad
+decision before it repeats," while keeping every claim tied to inspectable evidence.
 
 Provider selection is controlled by `LLM_PROVIDER`:
 
@@ -329,7 +352,7 @@ That starts the shared app pipeline and intentionally excludes `@mortemlabs/anch
 7. After the wizard shows the agent as verified, remove `MORTEM_VERIFY_TOKEN` from the agent env
    and code.
 8. Open the agent detail page to watch live traces.
-9. Open a trace detail page to inspect events, analysis, and sharing state.
+9. Open a trace detail page to inspect the chronology, analysis, and suggested next fix.
 
 ## Using The SDK
 
@@ -358,8 +381,8 @@ const mortem = new Mortem({
 })
 
 const session = await mortem.startSession({
-  inputSummary: "Answer a user question and optionally send a Solana transaction",
-  tags: ["local-dev"],
+  inputSummary: "Evaluate a Solana trade setup and optionally submit the swap",
+  tags: ["swap", "local-dev"],
 })
 
 try {
@@ -410,7 +433,7 @@ const tracedTools = mortem.wrapTools(tools)
 const tracedModel = mortem.wrapLanguageModel(model)
 
 const session = await mortem.startSession({
-  inputSummary: "Research a token and summarize the trade",
+  inputSummary: "Evaluate whether the bot should open a token position",
 })
 
 try {
