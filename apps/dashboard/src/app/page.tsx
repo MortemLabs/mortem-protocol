@@ -61,24 +61,6 @@ const featureBlocks = [
   },
 ]
 
-const quotes = [
-  {
-    attribution: "Bot operator · early design partner",
-    quote:
-      "I was guessing at why my bot kept bad-entering on volatility spikes. Mortem showed me the exact tool call that fired on a stale signal.",
-  },
-  {
-    attribution: "Agent builder · Solana team",
-    quote:
-      "The useful part wasn't the summary. It was seeing the payload, the quote age, and the execution outcome in one sequence I could actually debug.",
-  },
-  {
-    attribution: "Strategy operator · multi-wallet flow",
-    quote:
-      "We didn't need more charts. We needed the exact failure path. Mortem got us from bad trade to code change much faster.",
-  },
-]
-
 const faqs = [
   {
     answer:
