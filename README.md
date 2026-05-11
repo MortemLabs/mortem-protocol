@@ -147,10 +147,10 @@ The primary first-run path is `/app/agents/new`, a four-step onboarding wizard:
 
 1. Create the agent and reveal the plaintext API key one time.
 2. Install `@mortemlabs/sdk` with prefilled environment values, including the one-time
-   `MORTEM_VERIFY_TOKEN`.
+  `MORTEM_VERIFY_TOKEN`.
 3. Copy a minimal integration snippet or an AI-assistant prompt with the real credentials.
 4. Poll until the agent is both connected and verified. After verification, you can remove
-   `MORTEM_VERIFY_TOKEN` from the agent env and code.
+  `MORTEM_VERIFY_TOKEN` from the agent env and code.
 
 ### Database
 
@@ -224,7 +224,7 @@ Install these before running the full stack:
 - Privy app credentials
 - Helius API key for devnet RPC and transaction enrichment
 - Helius webhook ID if you want Mortem to manage the wallet watchlist automatically
-- Ollama cloud API key (https://ollama.com/settings/keys) or an Anthropic API key for analysis
+- Ollama cloud API key ([https://ollama.com/settings/keys](https://ollama.com/settings/keys)) or an Anthropic API key for analysis
 
 ## Environment Setup
 
@@ -269,8 +269,8 @@ Important environment values to set for the current architecture:
 
 - `HELIUS_WEBHOOK_ID` lets the server add and remove agent wallets from the existing Helius webhook.
 - `OLLAMA_API_KEY` and `OLLAMA_MODEL` are required when `LLM_PROVIDER=ollama`.
-- `MORTEM_INGEST_URL=http://localhost:4001` should be set in local agent projects. The SDK
-  default is `https://ingest.mortem.dev`, which is correct for hosted usage but not for local dev.
+- `MORTEM_INGEST_URL=http://localhost:4001` should be set in local agent projects. The SD  
+default is `https://ingest.mortemlabs.com`, which is correct for hosted usage but not for local dev.
 
 ## Install
 
@@ -347,10 +347,10 @@ That starts the shared app pipeline and intentionally excludes `@mortemlabs/anch
 3. Click `Add agent` or open `/app/agents/new`.
 4. Create an agent and copy the API key and verify token shown during onboarding. They are only shown once.
 5. Add `MORTEM_API_KEY`, `MORTEM_AGENT_ID`, `MORTEM_VERIFY_TOKEN`, and `MORTEM_INGEST_URL` to
-   your agent.
+  your agent.
 6. Run the agent once so the wizard can detect the first trace and verify ownership.
 7. After the wizard shows the agent as verified, remove `MORTEM_VERIFY_TOKEN` from the agent env
-   and code.
+  and code.
 8. Open the agent detail page to watch live traces.
 9. Open a trace detail page to inspect the chronology, analysis, and suggested next fix.
 
@@ -459,8 +459,8 @@ Important SDK notes:
 - `verifyToken` is sent only once, on the first flush after init.
 - `session.traceId` is an alias for `session.id`.
 - The SDK does not create public share links. Build dashboard URLs yourself from the trace id if
-  you want to print a local trace URL.
-- The default ingest URL is `https://ingest.mortem.dev`. Override it in local development.
+you want to print a local trace URL.
+- The default ingest URL is `https://ingest.mortemlabs.com`. Override it in local development.
 
 The SDK is designed to be best effort. Buffer flush errors are swallowed and reported through the
 optional logger instead of interrupting the agent.
@@ -515,7 +515,7 @@ corepack pnpm test
 - Use Helius devnet RPC for the MVP unless you are intentionally moving to mainnet.
 - Set `HELIUS_WEBHOOK_ID` if you want agent wallet creation and deletion to update the existing Helius webhook automatically.
 - Keep `MORTEM_MASTER_KEY` stable if you encrypt SDK payloads. Losing it means encrypted payloads
-  cannot be decrypted.
+cannot be decrypted.
 - Rotate agent API keys from the dashboard if a key leaks.
 - Ollama costs are tracked as externally billed usage, so the dashboard shows "tracked by Ollama" instead of a USD estimate.
 - The server verifies Privy JWTs with `verifyAuthToken` only.
