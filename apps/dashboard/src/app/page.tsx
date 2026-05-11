@@ -317,10 +317,10 @@ function TraceMoment({
 }>) {
   return (
     <article className="bg-ink-2 p-5">
-      <p className="case-meta text-signal">{meta}</p>
-      <h2 className="mt-4 font-display text-3xl leading-tight">{label}</h2>
-      <div className="mt-6 border-l-2 border-signal pl-4">
-        <p className="text-sm leading-6 text-muted-foreground">{detail}</p>
+      <p className="case-meta text-fg-muted">{meta}</p>
+      <h2 className="mt-3 font-display text-3xl leading-tight text-signal">{label}</h2>
+      <div className="mt-4 border-l-2 border-signal pl-4">
+        <p className="text-sm leading-6 text-foreground">{detail}</p>
       </div>
     </article>
   )
