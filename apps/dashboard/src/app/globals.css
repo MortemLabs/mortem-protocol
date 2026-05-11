@@ -90,8 +90,12 @@
   color: hsl(var(--ink));
 }
 
-* {
-  border-color: hsl(var(--border));
+/* Must live in @layer base — an unlayered * rule would override Tailwind
+   utilities like border-signal (unlayered beats @layer utilities). */
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
 }
 
 html,

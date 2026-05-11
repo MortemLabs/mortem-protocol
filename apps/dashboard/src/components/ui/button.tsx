@@ -20,6 +20,7 @@ const buttonVariants = cva(
         sm: "h-8 px-3",
       },
       variant: {
+        brand: "border border-signal bg-signal text-white hover:bg-ink-3",
         default: "bg-signal text-paper hover:brightness-110",
         destructive: "bg-signal text-paper hover:brightness-110",
         ghost: "text-foreground hover:bg-ink-3",

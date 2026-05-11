@@ -135,12 +135,17 @@ export default function LandingPage() {
             moment the strategy broke, and generates the code fix to prevent repeats.
           </p>
 
-          <div className="mt-10 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
-            <Button asChild size="lg">
+          <div className="mt-10 flex w-full max-w-md flex-col gap-4 sm:max-w-none sm:flex-row sm:justify-center sm:gap-6">
+            <Button
+              variant="brand"
+              asChild
+              size="lg"
+              className="px-8 text-xs font-semibold text-white hover:bg-ink hover:text-white hover:border-signal"
+            >
               <Link href="/app">Start Debugging</Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/share/demo">View a Sample Autopsy</Link>
+            <Button asChild size="lg" variant="outline" className="px-8 text-xs font-semibold hover:bg-ink hover:text-white hover:border-signal">
+              <Link href="https://cal.com/ifeelsam">Book a Demo</Link>
             </Button>
           </div>
 
