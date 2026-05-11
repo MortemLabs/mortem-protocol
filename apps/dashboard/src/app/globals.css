@@ -163,6 +163,88 @@ button {
   );
 }
 
+.landing-flare {
+  --flare-grid-opacity: 0.66;
+  --flare-x: 50%;
+  --flare-y: 18%;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 72% 34% at 50% -6%, hsl(var(--signal) / 0.24), transparent 64%),
+    radial-gradient(ellipse 52% 24% at 50% 18%, hsl(var(--paper) / 0.055), transparent 72%),
+    linear-gradient(112deg, transparent 22%, hsl(var(--signal) / 0.105) 45%, transparent 61%),
+    radial-gradient(ellipse at 50% 42%, transparent 0%, hsl(var(--ink) / 0.58) 68%, hsl(var(--ink)) 100%),
+    linear-gradient(180deg, hsl(var(--ink) / 0) 0%, hsl(var(--ink)) 76%);
+}
+
+.landing-flare::before {
+  content: "";
+  position: absolute;
+  top: 2.5rem;
+  left: 50%;
+  width: min(72rem, 86vw);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--signal) / 0.14) 18%,
+    hsl(var(--paper) / 0.2) 50%,
+    hsl(var(--signal) / 0.14) 82%,
+    transparent
+  );
+  box-shadow: 0 0 40px hsl(var(--signal) / 0.22);
+}
+
+.landing-flare::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(hsl(var(--paper) / 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--paper) / 0.016) 1px, transparent 1px),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--paper) / 0.018) 0 1px,
+      transparent 1px 56px
+    );
+  background-size:
+    100% 56px,
+    56px 100%,
+    auto;
+  mask-image: linear-gradient(180deg, black 0%, transparent 64%);
+  opacity: 0.82;
+}
+
+.landing-flare__grid-focus {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-image:
+    linear-gradient(hsl(var(--paper) / 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--paper) / 0.12) 1px, transparent 1px),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--signal) / 0.12) 0 1px,
+      transparent 1px 56px
+    );
+  background-size:
+    100% 56px,
+    56px 100%,
+    auto;
+  mask-image: radial-gradient(
+    circle 11rem at var(--flare-x) var(--flare-y),
+    black 0%,
+    black 28%,
+    transparent 74%
+  );
+  opacity: var(--flare-grid-opacity);
+  transition: opacity 120ms ease-out;
+}
+
 /* Thin hairline divider, brand-correct on both surfaces. */
 .hairline {
   border-bottom: 1px solid hsl(var(--line));

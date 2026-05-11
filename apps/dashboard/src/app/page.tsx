@@ -1,6 +1,7 @@
 // The landing page sells Mortem as a loss-debugging workflow for Solana trading bots. It keeps
 // the coroner voice, but the layout follows a focused developer-tool narrative instead of a broad
 // observability pitch.
+import { LandingFlare } from "@/components/landing-flare"
 import { Mark } from "@/components/mortem/mark"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -96,10 +97,11 @@ const faqs = [
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="tape h-2 w-full" aria-hidden="true" />
+    <main className="relative isolate min-h-screen overflow-hidden bg-background text-foreground">
+      <LandingFlare />
+      <div className="tape relative z-10 h-2 w-full" aria-hidden="true" />
 
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
         <nav
           className="flex items-center justify-between border-b border-line pb-6"
           aria-label="Primary"
