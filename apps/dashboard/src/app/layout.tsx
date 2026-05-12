@@ -26,8 +26,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Mortem — Ship. Bury. Repeat.",
-  description: "Every project gets a death certificate. Trace, autopsy, and file TypeScript AI agents on Solana.",
+  title: "Mortem",
+  description: "Forensic tools for onchain trading agents.",
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
