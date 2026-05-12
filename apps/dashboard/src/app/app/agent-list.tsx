@@ -74,8 +74,7 @@ function AuthenticatedAgentList() {
         </div>
         <h2 className="mt-5 font-display text-2xl leading-tight">Sign in to load agents</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-          Mortem checks your Privy JWT for agent ownership before returning traces, keys, or live
-          streams.
+          Sign in to access your agents and view their traces.
         </p>
         <Button type="button" className="mt-6" onClick={() => login()}>
           Sign in
