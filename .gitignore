@@ -13,3 +13,6 @@ target/
 *.tsbuildinfo
 .DS_Store
 mortem-signer.json
+
+graphify-out/
+.obsidian/
