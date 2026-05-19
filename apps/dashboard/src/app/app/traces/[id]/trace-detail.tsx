@@ -3,6 +3,7 @@
 "use client"
 
 import { trpc, useDashboardAuth } from "@/components/providers"
+import { CopyButton } from "@/components/mortem/copy-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
@@ -11,7 +12,6 @@ import {
   AlertCircle,
   ArrowLeft,
   ChevronRight,
-  Copy,
   ExternalLink,
   Loader2,
   RefreshCcw,
@@ -472,52 +472,65 @@ function TraceTimelinePanel({
       </div>
 
       <div className="divide-y divide-border">
-        {trace.events.map((event) => (
-          <details
-            key={event.id}
-            open={event.id === focusedEventId}
-            className="group p-4 open:bg-accent/40"
-          >
-            <summary className="flex cursor-pointer list-none items-start justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-              <button
-                type="button"
-                onClick={(clickEvent) => {
-                  clickEvent.preventDefault()
-                  onFocusEvent(event.id)
-                }}
-                className="min-w-0 text-left"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={eventVariant(event.type)}>{event.type}</Badge>
-                  <Badge variant={event.status === "ok" ? "success" : "error"}>
-                    {event.status}
-                  </Badge>
-                  <span className="font-mono text-xs text-muted-foreground">#{event.sequence}</span>
-                </div>
-                <p className="mt-2 text-sm font-medium">{eventHeadline(event)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatDate(event.startedAt)} · {formatDuration(event.durationMs)}
-                </p>
-              </button>
-              <ChevronRight
-                className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
-                aria-hidden="true"
-              />
-            </summary>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <TraceDetailRow label="Parent" value={event.parentEventId ?? "root"} />
-              <TraceDetailRow
-                label="Ended"
-                value={event.endedAt === null ? "pending" : formatDate(event.endedAt)}
-              />
-              <TraceDetailRow
-                label="Payload"
-                value={event.payloadEncrypted ? "encrypted" : "plain JSON"}
-              />
-              <TraceDetailRow label="Error" value={event.errorMessage ?? "none"} />
-            </div>
-          </details>
-        ))}
+        {trace.events.map((event) => {
+          const signature = eventSignature(event)
+
+          return (
+            <details
+              key={event.id}
+              open={event.id === focusedEventId}
+              className="group p-4 open:bg-accent/40"
+            >
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                <button
+                  type="button"
+                  onClick={(clickEvent) => {
+                    clickEvent.preventDefault()
+                    onFocusEvent(event.id)
+                  }}
+                  className="min-w-0 text-left"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={eventVariant(event.type)}>{event.type}</Badge>
+                    <Badge variant={event.status === "ok" ? "success" : "error"}>
+                      {event.status}
+                    </Badge>
+                    <span className="font-mono text-xs text-muted-foreground">#{event.sequence}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-medium">{eventHeadline(event)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatDate(event.startedAt)} · {formatDuration(event.durationMs)}
+                  </p>
+                </button>
+                <ChevronRight
+                  className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {signature === null ? null : (
+                  <div className="md:col-span-2">
+                    <p className="eyebrow">Signature</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="font-mono text-xs tabular-nums">{truncateHash(signature)}</p>
+                      <CopyButton label="Copy tx hash" size="sm" value={signature} />
+                    </div>
+                  </div>
+                )}
+                <TraceDetailRow label="Parent" value={event.parentEventId ?? "root"} />
+                <TraceDetailRow
+                  label="Ended"
+                  value={event.endedAt === null ? "pending" : formatDate(event.endedAt)}
+                />
+                <TraceDetailRow
+                  label="Payload"
+                  value={event.payloadEncrypted ? "encrypted" : "plain JSON"}
+                />
+                <TraceDetailRow label="Error" value={event.errorMessage ?? "none"} />
+              </div>
+            </details>
+          )
+        })}
       </div>
     </section>
   )
@@ -539,6 +552,7 @@ function TraceInspectorPanel({
   }
 
   const markdown = buildEventMarkdown(trace, event)
+  const signature = eventSignature(event)
 
   return (
     <aside className="min-w-0 border border-line bg-ink-2 text-card-foreground xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto">
@@ -547,6 +561,9 @@ function TraceInspectorPanel({
         <h2 className="mt-2 font-display text-2xl leading-tight">{eventHeadline(event)}</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <CopyButton label="Copy as markdown" value={markdown} />
+          {signature === null ? null : (
+            <CopyButton label="Copy tx hash" value={signature} />
+          )}
           <Badge variant={event.payloadEncrypted ? "warning" : "outline"}>
             {event.payloadEncrypted ? "encrypted" : "visible"}
           </Badge>
@@ -695,27 +712,6 @@ function TraceDetailMessage({
   )
 }
 
-function CopyButton({ label, value }: Readonly<{ label: string; value: string }>) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <Button type="button" variant="outline" onClick={copy}>
-      <Copy className="h-4 w-4" aria-hidden="true" />
-      {copied ? "Copied" : label}
-    </Button>
-  )
-}
-
 function TraceStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <div className="bg-ink-2 p-3">
@@ -851,7 +847,7 @@ function eventHeadline(event: TraceEventView): string {
 
   if (event.type === "solana_tx") {
     return (
-      readString(payload, "signature") ??
+      truncateHash(readString(payload, "signature")) ??
       readStringArray(payload, "instructionNames").join(", ") ??
       "solana tx"
     )
@@ -866,6 +862,14 @@ function eventHeadline(event: TraceEventView): string {
 
 function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? "null"
+}
+
+function truncateHash(value: string | null, start = 6, end = 6): string | null {
+  if (value === null || value.length <= start + end + 1) {
+    return value
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`
 }
 
 function formatDate(value: Date): string {
@@ -918,6 +922,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key]
   return typeof value === "string" ? value : null
+}
+
+function eventSignature(event: TraceEventView): string | null {
+  if (event.type !== "solana_tx") {
+    return null
+  }
+
+  const payload = isRecord(event.payload) ? event.payload : {}
+  return readString(payload, "signature")
 }
 
 function readStringArray(record: Record<string, unknown>, key: string): string[] {

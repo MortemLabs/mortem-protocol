@@ -1,5 +1,6 @@
 // Public share pages render trace evidence on the server so links remain readable without browser
 // JavaScript. Data is loaded through a public trace read instead of protected dashboard APIs.
+import { CopyButton } from "@/components/mortem/copy-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
@@ -146,6 +147,8 @@ function ShareMessage({ token }: Readonly<{ token: string }>) {
 }
 
 function SharedEventRow({ event }: Readonly<{ event: SharedEvent }>) {
+  const signature = eventSignature(event)
+
   return (
     <details className="group p-5">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
@@ -161,6 +164,14 @@ function SharedEventRow({ event }: Readonly<{ event: SharedEvent }>) {
           </p>
         </div>
       </summary>
+      {signature === null ? null : (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
+            {truncateHash(signature)}
+          </p>
+          <CopyButton label="Copy tx hash" size="sm" value={signature} />
+        </div>
+      )}
       <pre className="mt-4 max-h-96 overflow-auto border border-line bg-ink p-3 text-xs leading-5">
         {formatJson(event.payload)}
       </pre>
@@ -191,8 +202,7 @@ function eventHeadline(event: SharedEvent): string {
   }
 
   if (event.type === "solana_tx") {
-    const signature = readString(payload, "signature")
-    return signature ?? "solana transaction"
+    return truncateHash(readString(payload, "signature")) ?? "solana transaction"
   }
 
   if (event.type === "custom") {
@@ -204,6 +214,14 @@ function eventHeadline(event: SharedEvent): string {
 
 function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? "null"
+}
+
+function truncateHash(value: string | null, start = 6, end = 6): string | null {
+  if (value === null || value.length <= start + end + 1) {
+    return value
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`
 }
 
 function formatDate(value: Date): string {
@@ -252,6 +270,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key]
   return typeof value === "string" ? value : null
+}
+
+function eventSignature(event: SharedEvent): string | null {
+  if (event.type !== "solana_tx") {
+    return null
+  }
+
+  const payload = isRecord(event.payload) ? event.payload : {}
+  return readString(payload, "signature")
 }
 
 function statusVariant(
