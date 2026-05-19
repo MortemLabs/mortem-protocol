@@ -1,15 +1,82 @@
 // Agent detail data is fetched in the browser so Privy JWTs can protect private agent metadata.
-// Preview mode renders deterministic sample data for local UI work without backend credentials.
+// The dossier now adds a performance ledger built from recent trace history while preserving the
+// existing Mortem chrome and live stream posture.
 "use client"
 
+import {
+  PnLChart,
+  type PnLChartAnnotation,
+  type PnLChartPoint,
+} from "@/components/mortem/pnl-chart"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { usePrivy } from "@privy-io/react-auth"
-import { AlertCircle, ArrowLeft, Radio, ReceiptText, Settings } from "lucide-react"
+import type { inferRouterOutputs } from "@trpc/server"
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Radio,
+  ReceiptText,
+  RefreshCcw,
+  Settings,
+} from "lucide-react"
 import Link from "next/link"
-import type { RefObject } from "react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import type { ReactNode, RefObject } from "react"
+import { startTransition, useEffect, useMemo, useRef, useState } from "react"
+import type { AppRouter } from "../../../../../../server/src/server/root"
+
+type AgentView = NonNullable<inferRouterOutputs<AppRouter>["agents"]["get"]>
+type AgentSummary = Pick<
+  AgentView,
+  "displayName" | "environment" | "id" | "privateMode" | "retentionDays" | "verified"
+>
+type TraceHistoryRow = inferRouterOutputs<AppRouter>["traces"]["list"]["items"][number]
+type PerformanceState = "error" | "loading" | "ready"
+type CaseStatus = "alive" | "deceased" | "filed" | "paused"
+type Timeframe = "24h" | "30d" | "7d" | "all"
+
+type AgentPerformance = {
+  annotations: PnLChartAnnotation[]
+  chartSeries: Record<Timeframe, PnLChartPoint[]>
+  currentPnl: number | null
+  drawdownSeries: Record<Timeframe, PnLChartPoint[]>
+  latestFailure: TraceHistoryRow | null
+  latestTrace: TraceHistoryRow | null
+  lastActivityAt: Date | null
+  lastActivityLabel: string
+  note: string
+  recentRuns: TraceHistoryRow[]
+  runCount: number
+  status: CaseStatus
+  tradeCount: number
+  winRate: number | null
+  windowChange24h: number | null
+  windowChange7d: number | null
+}
+
+type LiveTraceRow = {
+  eventCount: number
+  events: Array<{ id: string; sequence: number; status: string; type: string }>
+  id: string
+  receivedAt: Date
+  status: string
+  summary: string
+  totalTokens: number
+}
+
+const timeframes: Array<{ label: string; value: Timeframe }> = [
+  { label: "24H", value: "24h" },
+  { label: "7D", value: "7d" },
+  { label: "30D", value: "30d" },
+  { label: "All", value: "all" },
+]
+
+const previewTraceHistory = createPreviewTraceHistory("01JAGENTPREVIEW")
+const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
 
 export function AgentDetail({ agentId }: Readonly<{ agentId: string }>) {
   const { privyEnabled } = useDashboardAuth()
@@ -23,9 +90,11 @@ export function AgentDetail({ agentId }: Readonly<{ agentId: string }>) {
           id: agentId,
           privateMode: false,
           retentionDays: 30,
-          verified: false,
+          verified: true,
         }}
         mode="preview"
+        performanceState="ready"
+        traceHistory={previewTraceHistory}
       />
     )
   }
@@ -37,6 +106,13 @@ function AuthenticatedAgentDetail({ agentId }: Readonly<{ agentId: string }>) {
   const { authenticated, login, ready } = usePrivy()
   const agent = trpc.agents.get.useQuery(
     { id: agentId },
+    {
+      enabled: ready && authenticated,
+      retry: 1,
+    },
+  )
+  const traces = trpc.traces.list.useQuery(
+    { agentId, limit: 60 },
     {
       enabled: ready && authenticated,
       retry: 1,
@@ -79,23 +155,38 @@ function AuthenticatedAgentDetail({ agentId }: Readonly<{ agentId: string }>) {
     )
   }
 
-  return <AgentDetailFrame agent={agentData} mode="private" />
+  const performanceState: PerformanceState = traces.isError
+    ? "error"
+    : traces.isLoading
+      ? "loading"
+      : "ready"
+
+  return (
+    <AgentDetailFrame
+      agent={agentData}
+      mode="private"
+      performanceState={performanceState}
+      traceHistory={traces.data?.items ?? []}
+      onRetryPerformance={() => traces.refetch()}
+    />
+  )
 }
 
 function AgentDetailFrame({
   agent,
   mode,
+  onRetryPerformance,
+  performanceState,
+  traceHistory,
 }: Readonly<{
-  agent: {
-    displayName: string
-    environment: string
-    id: string
-    privateMode: boolean
-    retentionDays: number
-    verified: boolean
-  }
+  agent: AgentSummary
   mode: "preview" | "private"
+  onRetryPerformance?: (() => void) | undefined
+  performanceState: PerformanceState
+  traceHistory: TraceHistoryRow[]
 }>) {
+  const performance = useMemo(() => buildAgentPerformance(agent, traceHistory), [agent, traceHistory])
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
@@ -106,54 +197,87 @@ function AgentDetailFrame({
           </Link>
         </Button>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="border border-line bg-ink-2 p-6 text-card-foreground">
-            <p className="eyebrow">Agent dossier</p>
-            <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-4xl leading-tight tracking-tight">
-                    {agent.displayName}
-                  </h1>
-                  <Badge variant={agent.privateMode ? "secondary" : "outline"}>
-                    {agent.privateMode ? "private" : "shared"}
-                  </Badge>
-                  {!agent.verified ? <Badge variant="warning">Unverified</Badge> : null}
-                  {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
+        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-6">
+            <div className="border border-line bg-ink-2 p-6 text-card-foreground">
+              <p className="eyebrow">Agent dossier</p>
+              <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="font-display text-4xl leading-tight tracking-tight">
+                      {agent.displayName}
+                    </h1>
+                    <Badge variant={agent.privateMode ? "secondary" : "outline"}>
+                      {agent.privateMode ? "private" : "shared"}
+                    </Badge>
+                    {!agent.verified ? <Badge variant="warning">Unverified</Badge> : null}
+                    {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
+                  </div>
+                  <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    {agent.id}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <CaseStatusBadge
+                      status={performance.status}
+                      pending={performanceState === "loading"}
+                    />
+                    <span className="case-meta text-fg-muted">
+                      Last activity ·{" "}
+                      {performanceState === "loading" ? "Measuring pulse" : performance.lastActivityLabel}
+                    </span>
+                    <span className="case-meta text-fg-muted">
+                      Retention · {agent.retentionDays} days
+                    </span>
+                  </div>
+                  {!agent.verified ? (
+                    <Link
+                      href={`/app/agents/new?agentId=${agent.id}`}
+                      className="mt-3 inline-flex font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-signal underline-offset-4 hover:underline"
+                    >
+                      Complete setup &rarr;
+                    </Link>
+                  ) : null}
                 </div>
-                <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                  {agent.id}
-                </p>
-                {!agent.verified ? (
-                  <Link
-                    href={`/app/agents/new?agentId=${agent.id}`}
-                    className="mt-3 inline-flex font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-signal underline-offset-4 hover:underline"
-                  >
-                    Complete setup &rarr;
-                  </Link>
-                ) : null}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button asChild variant="secondary">
+                    <Link href={`/app/agents/${agent.id}/traces`}>
+                      <ReceiptText className="h-4 w-4" aria-hidden="true" />
+                      Traces
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={`/app/agents/${agent.id}/settings`}>
+                      <Settings className="h-4 w-4" aria-hidden="true" />
+                      Settings
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button asChild variant="secondary">
-                  <Link href={`/app/agents/${agent.id}/traces`}>
-                    <ReceiptText className="h-4 w-4" aria-hidden="true" />
-                    Traces
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href={`/app/agents/${agent.id}/settings`}>
-                    <Settings className="h-4 w-4" aria-hidden="true" />
-                    Settings
-                  </Link>
-                </Button>
+
+              <div className="mt-8 grid gap-px bg-line md:grid-cols-4">
+                <ToplineStat label="Status" value={toplineStatusValue(performanceState, performance.status)} />
+                <ToplineStat label="Network" value={agent.environment} />
+                <ToplineStat
+                  label="Runs filed"
+                  value={performanceState === "loading" ? "Measuring pulse" : formatCount(performance.runCount)}
+                />
+                <ToplineStat
+                  label="Last activity"
+                  value={
+                    performanceState === "loading"
+                      ? "Measuring pulse"
+                      : performance.lastActivityAt?.toLocaleString() ?? "No pulse filed"
+                  }
+                />
               </div>
             </div>
 
-            <div className="mt-8 grid gap-3 md:grid-cols-3">
-              <Stat label="Network" value={agent.environment} />
-              <Stat label="Retention" value={`${agent.retentionDays} days`} />
-              <Stat label="Anchoring" value="memo tx" />
-            </div>
+            <PerformancePanel
+              agent={agent}
+              performance={performance}
+              performanceState={performanceState}
+              onRetryPerformance={onRetryPerformance}
+            />
           </div>
 
           {mode === "private" ? (
@@ -167,17 +291,801 @@ function AgentDetailFrame({
   )
 }
 
-type LiveTraceRow = {
-  eventCount: number
-  events: Array<{ id: string; sequence: number; status: string; type: string }>
-  id: string
-  receivedAt: Date
-  status: string
-  summary: string
-  totalTokens: number
+function PerformancePanel({
+  agent,
+  performance,
+  performanceState,
+  onRetryPerformance,
+}: Readonly<{
+  agent: AgentSummary
+  performance: AgentPerformance
+  performanceState: PerformanceState
+  onRetryPerformance?: (() => void) | undefined
+}>) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const timeframe = parseTimeframe(searchParams.get("range"))
+  const chartPoints = performance.chartSeries[timeframe]
+  const drawdownPoints = performance.drawdownSeries[timeframe]
+  const lineTone = performance.currentPnl !== null && performance.currentPnl < 0 ? "signal" : "paper"
+  const primaryTrace = performance.latestFailure ?? performance.latestTrace
+  const primaryAction =
+    !agent.verified
+      ? { href: `/app/agents/new?agentId=${agent.id}`, label: "Complete setup" }
+      : primaryTrace === null
+        ? { href: `/app/agents/${agent.id}/traces`, label: "Inspect trace archive" }
+        : {
+            href: `/app/traces/${primaryTrace.id}`,
+            label: performance.latestFailure === null ? "Inspect latest run" : "Open failure autopsy",
+          }
+
+  const updateTimeframe = (next: Timeframe) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "all") {
+      params.delete("range")
+    } else {
+      params.set("range", next)
+    }
+
+    const query = params.toString()
+    startTransition(() => {
+      router.replace(query.length === 0 ? pathname : `${pathname}?${query}`, { scroll: false })
+    })
+  }
+
+  return (
+    <section className="border border-line bg-ink text-card-foreground">
+      <div className="border-b border-line px-4 py-5 md:px-6 md:py-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="eyebrow">02 · Performance ledger</p>
+            <h2 className="mt-2 font-display text-3xl leading-tight">Cumulative P/L</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Read the pulse before the autopsy. The curve is reconstructed from filed run outcomes
+              until explicit trade P/L lands in trace payloads.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label="Performance timeframe">
+            {timeframes.map((item) => (
+              <TimeframeButton
+                key={item.value}
+                active={timeframe === item.value}
+                label={item.label}
+                onClick={() => updateTimeframe(item.value)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {performanceState === "loading" ? (
+        <PerformanceSkeleton />
+      ) : performanceState === "error" ? (
+        <PerformanceError onRetry={onRetryPerformance} />
+      ) : (
+        <div className="grid gap-4 p-4 md:p-6 2xl:grid-cols-[minmax(0,1.4fr)_320px]">
+          <div className="space-y-4">
+            <div className="border border-line bg-ink-2 p-4">
+              <div className="flex flex-col gap-3 border-b border-line pb-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="eyebrow">Curve</p>
+                  <h3 className="mt-2 font-display text-xl leading-tight">Filed outcome drift</h3>
+                </div>
+                <div className="flex flex-wrap gap-4 text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
+                  <LegendSwatch label="Curve" tone={lineTone} />
+                  <LegendSwatch label="Peak line" tone="signal" />
+                  <span className="font-mono">Drawdown is overlaid, not separate color-coded gain/loss.</span>
+                </div>
+              </div>
+
+              {chartPoints.length === 0 ? (
+                <PerformanceEmptyState />
+              ) : (
+                <div className="pt-4">
+                  <PnLChart annotations={performance.annotations} points={chartPoints} lineTone={lineTone} />
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="border border-line bg-ink-2 p-4">
+                <div className="flex flex-col gap-2 border-b border-line pb-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="eyebrow">Drawdown map</p>
+                    <h3 className="mt-2 font-display text-xl leading-tight">Damage window</h3>
+                  </div>
+                  <span className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
+                    Lower is worse. Zero means full recovery.
+                  </span>
+                </div>
+                {drawdownPoints.length === 0 ? (
+                  <PerformanceEmptyState compact />
+                ) : (
+                  <div className="pt-4">
+                    <PnLChart points={drawdownPoints} lineTone="signal" showDrawdown={false} />
+                  </div>
+                )}
+              </div>
+
+              <RecentFilingsCard runs={performance.recentRuns} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <MetricCard
+              label="Current P/L"
+              value={formatCurrency(performance.currentPnl)}
+              tone={metricTone(performance.currentPnl)}
+            />
+            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+              <MetricCard
+                label="24H change"
+                value={formatCurrency(performance.windowChange24h)}
+                tone={metricTone(performance.windowChange24h)}
+              />
+              <MetricCard
+                label="7D change"
+                value={formatCurrency(performance.windowChange7d)}
+                tone={metricTone(performance.windowChange7d)}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <MetricCard label="Win rate" value={formatPercent(performance.winRate)} />
+              <MetricCard
+                label="Trades / runs"
+                value={`${formatCount(performance.tradeCount)} / ${formatCount(performance.runCount)}`}
+              />
+            </div>
+            <MetricCard
+              label="Last activity"
+              value={performance.lastActivityLabel}
+              detail={performance.lastActivityAt?.toLocaleString() ?? "No pulse filed"}
+            />
+            <MetricCard label="Case note" value={performance.note} multiline />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button asChild>
+                <Link href={primaryAction.href}>
+                  {primaryAction.label}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/app/agents/${agent.id}/traces`}>Inspect trace archive</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
 }
 
-const ingestUrl = process.env.NEXT_PUBLIC_MORTEM_INGEST_URL ?? "http://localhost:4001"
+function RecentFilingsCard({ runs }: Readonly<{ runs: TraceHistoryRow[] }>) {
+  return (
+    <div className="border border-line bg-ink-2 p-4">
+      <div className="border-b border-line pb-3">
+        <p className="eyebrow">Recent filings</p>
+        <h3 className="mt-2 font-display text-xl leading-tight">Inspection queue</h3>
+      </div>
+      {runs.length === 0 ? (
+        <div className="py-6 text-sm leading-6 text-muted-foreground">
+          No runs are on file yet. Start a Mortem session and the registry will open the first case.
+        </div>
+      ) : (
+        <div className="divide-y divide-line">
+          {runs.map((trace) => (
+            <Link
+              key={trace.id}
+              href={`/app/traces/${trace.id}`}
+              className="block py-3 transition-colors hover:bg-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
+                <span className="case-meta text-fg-muted">{trace.startedAt.toLocaleString()}</span>
+              </div>
+              <p className="mt-2 text-sm leading-6">{trace.inputSummary}</p>
+              <div className="mt-2 flex flex-wrap gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
+                <span>{formatCount(trace.solanaTxCount)} txs</span>
+                <span>{formatCount(trace.eventCount)} events</span>
+                <span>{formatCount(trace.totalTokens)} tokens</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PerformanceSkeleton() {
+  return (
+    <div className="grid gap-4 p-4 md:p-6 2xl:grid-cols-[minmax(0,1.4fr)_320px]">
+      <div className="space-y-4">
+        <div className="border border-line bg-ink-2 p-4">
+          <div className="h-4 w-32 bg-ink-3" />
+          <div className="mt-4 h-7 w-52 bg-ink-3" />
+          <div className="mt-5 h-64 bg-ink-3" />
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="border border-line bg-ink-2 p-4">
+            <div className="h-4 w-28 bg-ink-3" />
+            <div className="mt-4 h-7 w-44 bg-ink-3" />
+            <div className="mt-5 h-48 bg-ink-3" />
+          </div>
+          <div className="border border-line bg-ink-2 p-4">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="mt-3 h-20 bg-ink-3 first:mt-0" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {[0, 1, 2, 3, 4].map((item) => (
+          <div key={item} className="h-20 border border-line bg-ink-2" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PerformanceError({ onRetry }: Readonly<{ onRetry?: (() => void) | undefined }>) {
+  return (
+    <div className="p-4 md:p-6">
+      <div className="border border-signal bg-ink-2 p-5">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h3 className="mt-4 font-display text-2xl leading-tight">Cause of death: performance load failure</h3>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          The dossier loaded, but the recent filings needed for the curve did not. Retry the case
+          history or inspect the live stream until the ledger returns.
+        </p>
+        {onRetry === undefined ? null : (
+          <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PerformanceEmptyState({ compact = false }: Readonly<{ compact?: boolean }>) {
+  return (
+    <div className={cn("flex flex-col items-start justify-center gap-3", compact ? "min-h-[180px]" : "min-h-[240px]")}>
+      <p className="eyebrow">No curve on file</p>
+      <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+        This agent has not filed enough runs to reconstruct a performance path yet. The next trace
+        will open the ledger.
+      </p>
+    </div>
+  )
+}
+
+function CaseStatusBadge({
+  pending = false,
+  status,
+}: Readonly<{
+  pending?: boolean
+  status: CaseStatus
+}>) {
+  if (pending) {
+    return <Badge variant="outline">Measuring pulse</Badge>
+  }
+
+  if (status === "deceased") {
+    return <span className="death-stamp">Deceased</span>
+  }
+
+  if (status === "filed") {
+    return <Badge variant="warning">Filed</Badge>
+  }
+
+  if (status === "paused") {
+    return <Badge variant="outline">Paused</Badge>
+  }
+
+  return <Badge variant="success">Alive</Badge>
+}
+
+function TimeframeButton({
+  active,
+  label,
+  onClick,
+}: Readonly<{ active: boolean; label: string; onClick: () => void }>) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex min-h-10 items-center border px-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
+        active ? "border-signal bg-ink text-paper" : "border-line text-muted-foreground hover:bg-ink",
+      )}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
+function LegendSwatch({ label, tone }: Readonly<{ label: string; tone: "paper" | "signal" }>) {
+  return (
+    <span className="inline-flex items-center gap-2 font-mono">
+      <span
+        className={cn(
+          "h-2 w-4 border",
+          tone === "signal" ? "border-signal bg-signal/20" : "border-line bg-paper/10",
+        )}
+        aria-hidden="true"
+      />
+      {label}
+    </span>
+  )
+}
+
+function ToplineStat({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
+  return (
+    <div className="bg-ink p-4">
+      <p className="eyebrow">{label}</p>
+      <div className="mt-2 break-words font-mono text-sm tabular-nums text-paper">{value}</div>
+    </div>
+  )
+}
+
+function MetricCard({
+  detail,
+  label,
+  multiline = false,
+  tone,
+  value,
+}: Readonly<{
+  detail?: string
+  label: string
+  multiline?: boolean
+  tone?: "default" | "signal"
+  value: string
+}>) {
+  return (
+    <div className="border border-line bg-ink-2 p-4">
+      <p className="eyebrow">{label}</p>
+      <p
+        className={cn(
+          "mt-2 font-mono text-sm tabular-nums",
+          multiline ? "normal-case tracking-normal leading-6 text-paper" : undefined,
+          tone === "signal" ? "text-signal" : "text-paper",
+        )}
+      >
+        {value}
+      </p>
+      {detail === undefined ? null : (
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
+      )}
+    </div>
+  )
+}
+
+function buildAgentPerformance(agent: AgentSummary, traces: TraceHistoryRow[]): AgentPerformance {
+  const orderedTraces = [...traces].sort((left, right) => left.startedAt.getTime() - right.startedAt.getTime())
+  const latestTrace = orderedTraces.at(-1) ?? null
+  const latestFailure = [...orderedTraces].reverse().find((trace) => isFailureStatus(trace.status)) ?? null
+  const fullSeries = buildPerformanceSeries(agent.id, orderedTraces)
+  const drawdownSeries = buildDrawdownSeries(fullSeries)
+  const finishedTraces = orderedTraces.filter((trace) => isTerminalStatus(trace.status))
+  const completedRuns = finishedTraces.filter((trace) => trace.status === "completed").length
+  const winRate = finishedTraces.length === 0 ? null : completedRuns / finishedTraces.length
+  const status = deriveCaseStatus(agent.verified, orderedTraces)
+  const runCount = traces.length
+  const tradeCount = orderedTraces.reduce((total, trace) => total + trace.solanaTxCount, 0)
+  const lastActivityAt = latestTrace?.startedAt ?? null
+
+  return {
+    annotations: buildAnnotations(fullSeries),
+    chartSeries: {
+      "24h": sliceSeries(fullSeries, 24 * 60 * 60 * 1000),
+      "30d": sliceSeries(fullSeries, 30 * 24 * 60 * 60 * 1000),
+      "7d": sliceSeries(fullSeries, 7 * 24 * 60 * 60 * 1000),
+      all: fullSeries,
+    },
+    currentPnl: fullSeries.at(-1)?.value ?? null,
+    drawdownSeries: {
+      "24h": sliceSeries(drawdownSeries, 24 * 60 * 60 * 1000),
+      "30d": sliceSeries(drawdownSeries, 30 * 24 * 60 * 60 * 1000),
+      "7d": sliceSeries(drawdownSeries, 7 * 24 * 60 * 60 * 1000),
+      all: drawdownSeries,
+    },
+    latestFailure,
+    latestTrace,
+    lastActivityAt,
+    lastActivityLabel: formatRelativeTime(lastActivityAt),
+    note: performanceNote(status, orderedTraces, latestFailure),
+    recentRuns: [...orderedTraces].reverse().slice(0, 3),
+    runCount,
+    status,
+    tradeCount,
+    winRate,
+    windowChange24h: deltaSince(fullSeries, 24 * 60 * 60 * 1000),
+    windowChange7d: deltaSince(fullSeries, 7 * 24 * 60 * 60 * 1000),
+  }
+}
+
+function buildPerformanceSeries(agentId: string, traces: TraceHistoryRow[]): PnLChartPoint[] {
+  if (traces.length === 0) {
+    return []
+  }
+
+  let cumulative = 0
+  let peak = 0
+
+  return traces.map((trace) => {
+    const intensity = Math.min(
+      7.5,
+      Math.max(
+        1.2,
+        trace.eventCount / 3.2 +
+          trace.solanaTxCount * 1.4 +
+          Math.log10(trace.totalTokens + 10) +
+          Math.min(2.5, trace.toolsCalled.length * 0.3),
+      ),
+    )
+    const wobble = (hashUnit(`${agentId}:${trace.id}`) - 0.5) * 6
+    const delta =
+      trace.status === "completed"
+        ? 11 + intensity * 7.2 + wobble
+        : trace.status === "running"
+          ? 0.8 + intensity * 1.5
+          : -(16 + intensity * 8.8 + Math.abs(wobble) * 2.2)
+
+    cumulative = roundMetric(cumulative + delta)
+    peak = Math.max(peak, cumulative)
+
+    return {
+      drawdown: roundMetric(cumulative - peak),
+      label: formatChartLabel(trace.startedAt),
+      timestamp: trace.startedAt.getTime(),
+      value: cumulative,
+    }
+  })
+}
+
+function buildDrawdownSeries(points: PnLChartPoint[]): PnLChartPoint[] {
+  return points.map((point) => ({
+    ...point,
+    value: point.drawdown,
+  }))
+}
+
+function buildAnnotations(points: PnLChartPoint[]): PnLChartAnnotation[] {
+  if (points.length === 0) {
+    return []
+  }
+
+  const firstPoint = points[0]
+  if (firstPoint === undefined) {
+    return []
+  }
+
+  const biggestDrawdown = points.reduce(
+    (worst, point) => (point.drawdown < worst.drawdown ? point : worst),
+    firstPoint,
+  )
+  const lossPoints = points.slice(1).filter((point, index) => {
+    const previous = points[index]
+    return previous !== undefined && point.value < previous.value - 12
+  })
+  const lastMajorLoss = lossPoints.at(-1)
+
+  return [
+    {
+      label: "Biggest drawdown",
+      timestamp: biggestDrawdown.timestamp,
+      tone: "signal",
+    },
+    ...(lastMajorLoss === undefined || lastMajorLoss.timestamp === biggestDrawdown.timestamp
+      ? []
+      : [
+          {
+            label: "Last major loss",
+            timestamp: lastMajorLoss.timestamp,
+            tone: "signal" as const,
+          },
+        ]),
+  ]
+}
+
+function deriveCaseStatus(verified: boolean, traces: TraceHistoryRow[]): CaseStatus {
+  if (!verified) {
+    return "filed"
+  }
+
+  const latest = traces.at(-1)
+  if (latest === undefined) {
+    return "paused"
+  }
+
+  const now = Date.now()
+  const recentFinished = traces.filter(
+    (trace) => isTerminalStatus(trace.status) && trace.startedAt.getTime() >= now - 7 * 24 * 60 * 60 * 1000,
+  )
+  const recentFailures = recentFinished.filter((trace) => isFailureStatus(trace.status)).length
+  const consecutiveFailures = countConsecutiveFailures(traces)
+  const failureRate = recentFinished.length === 0 ? 0 : recentFailures / recentFinished.length
+
+  if (consecutiveFailures >= 3 || (recentFinished.length >= 4 && failureRate >= 0.6)) {
+    return "deceased"
+  }
+
+  if (now - latest.startedAt.getTime() > 24 * 60 * 60 * 1000) {
+    return "paused"
+  }
+
+  return "alive"
+}
+
+function countConsecutiveFailures(traces: TraceHistoryRow[]): number {
+  let count = 0
+
+  for (let index = traces.length - 1; index >= 0; index -= 1) {
+    const trace = traces[index]
+    if (trace === undefined) {
+      continue
+    }
+
+    if (!isTerminalStatus(trace.status)) {
+      continue
+    }
+
+    if (!isFailureStatus(trace.status)) {
+      break
+    }
+
+    count += 1
+  }
+
+  return count
+}
+
+function performanceNote(
+  status: CaseStatus,
+  traces: TraceHistoryRow[],
+  latestFailure: TraceHistoryRow | null,
+): string {
+  if (status === "filed") {
+    return "Awaiting verification token. The case is on file, but the pulse is not yet trusted."
+  }
+
+  if (status === "deceased") {
+    return latestFailure === null
+      ? "Cause of death is still forming, but failed runs are outpacing recoveries."
+      : `Cause of death points to ${latestFailure.inputSummary.toLowerCase()}. Open the trace before the pattern repeats.`
+  }
+
+  if (status === "paused") {
+    return traces.length === 0
+      ? "No pulse has been filed yet."
+      : "The case is quiet. Last activity has fallen outside the current watch window."
+  }
+
+  return "The pulse is still measurable. Completed runs continue to outweigh recent loss windows."
+}
+
+function sliceSeries(points: PnLChartPoint[], durationMs: number): PnLChartPoint[] {
+  if (points.length === 0) {
+    return []
+  }
+
+  const cutoff = Date.now() - durationMs
+  return points.filter((point) => point.timestamp >= cutoff)
+}
+
+function deltaSince(points: PnLChartPoint[], durationMs: number): number | null {
+  if (points.length === 0) {
+    return null
+  }
+
+  const cutoff = Date.now() - durationMs
+  const latest = points.at(-1)
+  if (latest === undefined) {
+    return null
+  }
+
+  const firstPoint = points[0]
+  if (firstPoint === undefined) {
+    return null
+  }
+
+  const baseline =
+    [...points].reverse().find((point) => point.timestamp <= cutoff) ??
+    points.find((point) => point.timestamp >= cutoff) ??
+    firstPoint
+
+  return roundMetric(latest.value - baseline.value)
+}
+
+function parseTimeframe(value: string | null): Timeframe {
+  return value === "24h" || value === "7d" || value === "30d" ? value : "all"
+}
+
+function isTerminalStatus(status: string): boolean {
+  return status === "completed" || status === "errored" || status === "timeout"
+}
+
+function isFailureStatus(status: string): boolean {
+  return status === "errored" || status === "timeout"
+}
+
+function metricTone(value: number | null): "default" | "signal" {
+  return value !== null && value < 0 ? "signal" : "default"
+}
+
+function toplineStatusValue(performanceState: PerformanceState, status: CaseStatus): string {
+  if (performanceState === "loading") {
+    return "Measuring pulse"
+  }
+
+  if (status === "deceased") {
+    return "Deceased"
+  }
+
+  if (status === "filed") {
+    return "Filed"
+  }
+
+  if (status === "paused") {
+    return "Paused"
+  }
+
+  return "Alive"
+}
+
+function formatCurrency(value: number | null): string {
+  if (value === null) {
+    return "Pending"
+  }
+
+  const abs = Math.abs(value)
+  const precision = abs >= 100 ? 0 : 1
+  return `${value < 0 ? "-" : value > 0 ? "+" : ""}$${abs.toFixed(precision)}`
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return "Pending"
+  }
+
+  return `${Math.round(value * 100)}%`
+}
+
+function formatCount(value: number): string {
+  return value.toLocaleString()
+}
+
+function formatRelativeTime(value: Date | null): string {
+  if (value === null) {
+    return "No pulse filed"
+  }
+
+  const diffMs = value.getTime() - Date.now()
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  if (Math.abs(diffMs) < hour) {
+    return rtf.format(Math.round(diffMs / minute), "minute")
+  }
+
+  if (Math.abs(diffMs) < day) {
+    return rtf.format(Math.round(diffMs / hour), "hour")
+  }
+
+  return rtf.format(Math.round(diffMs / day), "day")
+}
+
+function formatChartLabel(value: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+  }).format(value)
+}
+
+function createPreviewTraceHistory(agentId: string): TraceHistoryRow[] {
+  const seeds = [
+    {
+      eventCount: 8,
+      hoursAgo: 90,
+      inputSummary: "Route evaluation before SOL to USDC execution.",
+      solanaTxCount: 1,
+      status: "completed",
+      totalTokens: 2280,
+    },
+    {
+      eventCount: 10,
+      hoursAgo: 64,
+      inputSummary: "Retry window after stale quote detection.",
+      solanaTxCount: 2,
+      status: "completed",
+      totalTokens: 3010,
+    },
+    {
+      eventCount: 12,
+      hoursAgo: 42,
+      inputSummary: "Liquidity sweep after spread expansion.",
+      solanaTxCount: 3,
+      status: "errored",
+      totalTokens: 3880,
+    },
+    {
+      eventCount: 11,
+      hoursAgo: 28,
+      inputSummary: "Recovery path after guardrail refresh.",
+      solanaTxCount: 2,
+      status: "completed",
+      totalTokens: 3440,
+    },
+    {
+      eventCount: 9,
+      hoursAgo: 14,
+      inputSummary: "Memo anchoring and post-trade reconciliation.",
+      solanaTxCount: 1,
+      status: "completed",
+      totalTokens: 2810,
+    },
+    {
+      eventCount: 7,
+      hoursAgo: 2,
+      inputSummary: "Latest run waiting on live settlement signal.",
+      solanaTxCount: 1,
+      status: "running",
+      totalTokens: 1090,
+    },
+  ] as const
+
+  return seeds.map((seed, index) => {
+    const startedAt = hoursAgo(seed.hoursAgo)
+    const endedAt = seed.status === "running" ? null : new Date(startedAt.getTime() + 1800)
+    return {
+      agentId,
+      anchorSignature: null,
+      anchorSlot: null,
+      durationMs: seed.status === "running" ? null : 1800,
+      endedAt,
+      errorMessage: seed.status === "errored" ? "Spread moved outside guardrail." : null,
+      eventCount: seed.eventCount,
+      id: `${agentId}-trace-${String(index).padStart(2, "0")}`,
+      inputSummary: seed.inputSummary,
+      merkleProof: null,
+      outputSummary: seed.status === "completed" ? "Run filed." : null,
+      shareToken: null,
+      solanaTxCount: seed.solanaTxCount,
+      startedAt,
+      status: seed.status,
+      tags: ["preview"],
+      traceHash: null,
+      toolsCalled: ["jupiter.quote"],
+      totalCostUsd: 0 as unknown as TraceHistoryRow["totalCostUsd"],
+      totalLamports: BigInt(seed.solanaTxCount * 5000) as unknown as TraceHistoryRow["totalLamports"],
+      totalTokens: seed.totalTokens,
+    }
+  }) as TraceHistoryRow[]
+}
+
+function hoursAgo(hours: number): Date {
+  return new Date(Date.now() - hours * 60 * 60 * 1000)
+}
+
+function hashUnit(input: string): number {
+  let hash = 2166136261
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return ((hash >>> 0) % 1000) / 1000
+}
+
+function roundMetric(value: number): number {
+  return Math.round(value * 10) / 10
+}
 
 function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>) {
   const { authenticated, getAccessToken } = usePrivy()
@@ -421,7 +1329,7 @@ function LiveStreamFrame({
           value={filter}
           onChange={(event) => setFilter(event.currentTarget.value)}
           placeholder="Filter live traces"
-          className="min-h-10 min-w-0 flex-1 border-b border-line bg-transparent px-3 font-mono text-xs uppercase tracking-[0.12em] focus-visible:outline-none focus-visible:border-signal"
+          className="min-h-10 min-w-0 flex-1 border-b border-line bg-transparent px-3 font-mono text-xs uppercase tracking-[0.12em] focus-visible:border-signal focus-visible:outline-none"
         />
         <Button
           type="button"
@@ -608,14 +1516,21 @@ function AgentDetailSkeleton() {
     >
       <div className="mx-auto max-w-7xl">
         <div className="h-10 w-28 bg-ink-3" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-h-64 border border-line bg-ink-2 p-6">
-            <div className="h-8 w-64 bg-ink-3" />
-            <div className="mt-4 h-4 w-44 bg-ink-3" />
-            <div className="mt-8 grid gap-3 md:grid-cols-3">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="h-24 bg-ink-3" />
-              ))}
+        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-6">
+            <div className="min-h-64 border border-line bg-ink-2 p-6">
+              <div className="h-8 w-64 bg-ink-3" />
+              <div className="mt-4 h-4 w-44 bg-ink-3" />
+              <div className="mt-8 grid gap-px bg-line md:grid-cols-4">
+                {[0, 1, 2, 3].map((item) => (
+                  <div key={item} className="h-24 bg-ink" />
+                ))}
+              </div>
+            </div>
+            <div className="border border-line bg-ink p-4">
+              <div className="h-4 w-36 bg-ink-3" />
+              <div className="mt-4 h-8 w-56 bg-ink-3" />
+              <div className="mt-5 h-64 bg-ink-3" />
             </div>
           </div>
           <div className="min-h-64 border border-line bg-ink-2 p-5">
@@ -661,14 +1576,5 @@ function AgentMessage({
         </div>
       </section>
     </main>
-  )
-}
-
-function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className="border border-line p-4">
-      <p className="eyebrow">{label}</p>
-      <p className="mt-2 break-all font-mono text-sm tabular-nums">{value}</p>
-    </div>
   )
 }
