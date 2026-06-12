@@ -115,14 +115,9 @@ export default function LandingPage() {
               Mortem<span className="pl-0.5 text-[#DC2626] text-4xl">.</span>
             </span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost">
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/app">Open dossier</Link>
-            </Button>
-          </div>
+          <Button asChild variant="brand">
+            <Link href="/app">Get started</Link>
+          </Button>
         </nav>
 
         <section className="flex min-h-[calc(100vh-7rem)] flex-col items-center justify-center py-16 text-center md:py-20">
