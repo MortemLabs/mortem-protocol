@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Loader2,
   RefreshCcw,
+  Search,
   Share2,
 } from "lucide-react"
 import Link from "next/link"
@@ -215,7 +216,12 @@ function AuthenticatedTraceDetail({ traceId }: Readonly<{ traceId: string }>) {
   const utils = trpc.useUtils()
   const trace = trpc.traces.get.useQuery(
     { id: traceId },
-    { enabled: ready && authenticated, retry: 1 },
+    {
+      enabled: ready && authenticated,
+      retry: 1,
+      // A running trace keeps producing events; poll until it reaches a terminal state.
+      refetchInterval: (query) => (query.state.data?.status === "running" ? 4000 : false),
+    },
   )
   const share = trpc.traces.share.useMutation({
     onSuccess: async () => {
@@ -380,6 +386,35 @@ function TraceMetadataPanel({
         <TraceStat label="Lamports" value={trace.totalLamports} />
         <TraceStat label="Txs" value={String(trace.solanaTxCount)} />
       </div>
+
+      <section className="border-b border-line p-4">
+        <h2 className="eyebrow">Cause of death</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
+          {trace.endedAt === null ? (
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
+              in progress
+            </span>
+          ) : (
+            <span
+              className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted"
+              title={formatDate(trace.endedAt)}
+            >
+              closed {formatRelative(trace.endedAt)}
+            </span>
+          )}
+        </div>
+        {trace.errorMessage === null ? (
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {trace.outputSummary ?? "No closing summary was recorded for this trace."}
+          </p>
+        ) : (
+          <p className="mt-3 break-words border border-signal/40 bg-ink p-3 text-sm leading-6 text-signal">
+            {trace.errorMessage}
+          </p>
+        )}
+      </section>
+
       <section className="border-b border-line p-4">
         <h2 className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em]">
           <Share2 className="h-4 w-4" aria-hidden="true" />
@@ -436,6 +471,31 @@ function TraceTimelinePanel({
   onFocusEvent: (id: string) => void
   trace: TraceDetailView
 }>) {
+  const [query, setQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+
+  const depthMap = useMemo(() => buildDepthMap(trace.events), [trace.events])
+  const eventTypes = useMemo(
+    () => Array.from(new Set(trace.events.map((event) => event.type))),
+    [trace.events],
+  )
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredEvents = useMemo(
+    () =>
+      trace.events.filter((event) => {
+        if (typeFilter !== "all" && event.type !== typeFilter) {
+          return false
+        }
+
+        if (normalizedQuery.length === 0) {
+          return true
+        }
+
+        return eventSearchText(event).includes(normalizedQuery)
+      }),
+    [trace.events, typeFilter, normalizedQuery],
+  )
+
   return (
     <section className="min-w-0 border border-line bg-ink-2 text-card-foreground">
       <div className="border-b border-line p-4">
@@ -447,7 +507,47 @@ function TraceTimelinePanel({
           <Badge variant="outline">{formatDate(trace.startedAt)}</Badge>
         </div>
 
-        <label className="mt-4 block text-xs font-medium text-muted-foreground" htmlFor="scrub">
+        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder="Search events, payloads, signatures"
+              aria-label="Search events"
+              className="h-10 w-full border border-line bg-ink pl-9 pr-3 font-mono text-xs outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter events by type">
+            <button
+              type="button"
+              aria-pressed={typeFilter === "all"}
+              data-active={typeFilter === "all"}
+              onClick={() => setTypeFilter("all")}
+              className="inline-flex min-h-9 items-center border border-line px-3 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:border-signal data-[active=true]:text-paper"
+            >
+              all
+            </button>
+            {eventTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={typeFilter === type}
+                data-active={typeFilter === type}
+                onClick={() => setTypeFilter(type)}
+                className="inline-flex min-h-9 items-center border border-line px-3 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:border-signal data-[active=true]:text-paper"
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="mt-4 block font-mono text-[0.625rem] uppercase tracking-[0.16em] text-fg-muted" htmlFor="scrub">
           Scrub events
         </label>
         <input
@@ -462,71 +562,98 @@ function TraceTimelinePanel({
               onFocusEvent(next.id)
             }
           }}
-          className="mt-2 h-10 w-full accent-primary"
+          className="mt-2 h-10 w-full accent-signal"
         />
       </div>
 
-      <div className="divide-y divide-border">
-        {trace.events.map((event) => {
-          const signature = eventSignature(event)
+      {filteredEvents.length === 0 ? (
+        <p className="p-4 font-mono text-xs uppercase tracking-[0.16em] text-fg-muted">
+          No events match this filter.
+        </p>
+      ) : (
+        <div className="divide-y divide-line">
+          {filteredEvents.map((event) => {
+            const signature = eventSignature(event)
+            const depth = depthMap[event.id] ?? 0
 
-          return (
-            <details
-              key={event.id}
-              open={event.id === focusedEventId}
-              className="group p-4 open:bg-accent/40"
-            >
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <button
-                  type="button"
-                  onClick={(clickEvent) => {
-                    clickEvent.preventDefault()
-                    onFocusEvent(event.id)
-                  }}
-                  className="min-w-0 text-left"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={eventVariant(event.type)}>{event.type}</Badge>
-                    <Badge variant={event.status === "ok" ? "success" : "error"}>
-                      {event.status}
-                    </Badge>
-                    <span className="font-mono text-xs text-muted-foreground">#{event.sequence}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-medium">{eventHeadline(event)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatDate(event.startedAt)} · {formatDuration(event.durationMs)}
-                  </p>
-                </button>
-                <ChevronRight
-                  className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
-                  aria-hidden="true"
-                />
-              </summary>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {signature === null ? null : (
-                  <div className="md:col-span-2">
-                    <p className="eyebrow">Signature</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <p className="font-mono text-xs tabular-nums">{truncateHash(signature)}</p>
-                      <CopyButton label="Copy tx hash" size="sm" value={signature} />
+            return (
+              <details
+                key={event.id}
+                open={event.id === focusedEventId}
+                className="group p-4 open:bg-ink-3"
+                style={{ paddingLeft: `${16 + depth * 20}px` }}
+              >
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <button
+                    type="button"
+                    onClick={(clickEvent) => {
+                      clickEvent.preventDefault()
+                      onFocusEvent(event.id)
+                    }}
+                    className="min-w-0 text-left"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      {depth > 0 ? (
+                        <span className="font-mono text-xs text-line" aria-hidden="true">
+                          └
+                        </span>
+                      ) : null}
+                      <Badge variant={eventVariant(event.type)}>{event.type}</Badge>
+                      <Badge variant={event.status === "ok" ? "success" : "error"}>
+                        {event.status}
+                      </Badge>
+                      <span className="font-mono text-xs text-fg-muted">#{event.sequence}</span>
                     </div>
-                  </div>
-                )}
-                <TraceDetailRow label="Parent" value={event.parentEventId ?? "root"} />
-                <TraceDetailRow
-                  label="Ended"
-                  value={event.endedAt === null ? "pending" : formatDate(event.endedAt)}
-                />
-                <TraceDetailRow
-                  label="Payload"
-                  value={event.payloadEncrypted ? "encrypted" : "plain JSON"}
-                />
-                <TraceDetailRow label="Error" value={event.errorMessage ?? "none"} />
-              </div>
-            </details>
-          )
-        })}
-      </div>
+                    <p className="mt-2 text-sm font-medium">{eventHeadline(event)}</p>
+                    <p
+                      className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-fg-muted"
+                      title={formatDate(event.startedAt)}
+                    >
+                      +{formatOffset(trace.startedAt, event.startedAt)} ·{" "}
+                      {formatDuration(event.durationMs)}
+                    </p>
+                  </button>
+                  <ChevronRight
+                    className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {signature === null ? null : (
+                    <div className="md:col-span-2">
+                      <p className="eyebrow">Signature</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-xs tabular-nums">{truncateHash(signature)}</p>
+                        <CopyButton label="Copy tx hash" size="sm" value={signature} />
+                        <Button asChild size="sm" variant="outline">
+                          <Link
+                            href={explorerTxUrl(signature, eventCluster(event))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Explorer
+                            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <TraceDetailRow label="Parent" value={event.parentEventId ?? "root"} />
+                  <TraceDetailRow
+                    label="Ended"
+                    value={event.endedAt === null ? "pending" : formatDate(event.endedAt)}
+                  />
+                  <TraceDetailRow
+                    label="Payload"
+                    value={event.payloadEncrypted ? "encrypted" : "plain JSON"}
+                  />
+                  <TraceDetailRow label="Error" value={event.errorMessage ?? "none"} />
+                </div>
+              </details>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
@@ -537,8 +664,9 @@ function TraceInspectorPanel({
 }: Readonly<{ event: TraceEventView | null; trace: TraceDetailView }>) {
   if (event === null) {
     return (
-      <aside className="border border-border bg-card p-4 text-card-foreground">
-        <h2 className="text-xl font-semibold tracking-normal">Context inspector</h2>
+      <aside className="border border-line bg-ink-2 p-4 text-card-foreground">
+        <p className="eyebrow">Inspector</p>
+        <h2 className="mt-2 font-display text-2xl leading-tight">Context inspector</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           No events were captured for this trace.
         </p>
@@ -556,8 +684,18 @@ function TraceInspectorPanel({
         <h2 className="mt-2 font-display text-2xl leading-tight">{eventHeadline(event)}</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <CopyButton label="Copy as markdown" value={markdown} />
+          {signature === null ? null : <CopyButton label="Copy tx hash" value={signature} />}
           {signature === null ? null : (
-            <CopyButton label="Copy tx hash" value={signature} />
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={explorerTxUrl(signature, eventCluster(event))}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Explorer
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
           )}
           <Badge variant={event.payloadEncrypted ? "warning" : "outline"}>
             {event.payloadEncrypted ? "encrypted" : "visible"}
@@ -836,15 +974,20 @@ function eventHeadline(event: TraceEventView): string {
   }
 
   if (event.type === "tool_call") {
-    return readString(payload, "toolName") ?? "tool call"
+    const toolName = readString(payload, "toolName") ?? "tool call"
+    const output = isRecord(payload.output) ? payload.output : null
+    const impact = output === null ? null : readNumber(output, "priceImpactPct")
+    return impact === null ? toolName : `${toolName} · ${impact}% impact`
   }
 
   if (event.type === "solana_tx") {
-    return (
-      truncateHash(readString(payload, "signature")) ??
-      readStringArray(payload, "instructionNames").join(", ") ??
-      "solana tx"
-    )
+    const instructions = readStringArray(payload, "instructionNames")
+    const status = readString(payload, "confirmationStatus")
+    const label =
+      instructions.length > 0
+        ? instructions.join(", ")
+        : (truncateHash(readString(payload, "signature")) ?? "solana tx")
+    return status === null ? label : `${label} · ${status}`
   }
 
   if (event.type === "custom") {
@@ -852,6 +995,68 @@ function eventHeadline(event: TraceEventView): string {
   }
 
   return event.type
+}
+
+function buildDepthMap(events: TraceEventView[]): Record<string, number> {
+  const byId = new Map(events.map((event) => [event.id, event]))
+  const cache: Record<string, number> = {}
+
+  const depthOf = (event: TraceEventView, seen: Set<string>): number => {
+    if (cache[event.id] !== undefined) {
+      return cache[event.id]
+    }
+
+    if (event.parentEventId === null || seen.has(event.id)) {
+      cache[event.id] = 0
+      return 0
+    }
+
+    const parent = byId.get(event.parentEventId)
+    if (parent === undefined) {
+      cache[event.id] = 0
+      return 0
+    }
+
+    seen.add(event.id)
+    const depth = depthOf(parent, seen) + 1
+    cache[event.id] = depth
+    return depth
+  }
+
+  for (const event of events) {
+    depthOf(event, new Set())
+  }
+
+  return cache
+}
+
+function eventSearchText(event: TraceEventView): string {
+  return [
+    event.type,
+    event.status,
+    String(event.sequence),
+    eventHeadline(event),
+    event.errorMessage ?? "",
+    formatJson(event.payload),
+  ]
+    .join(" ")
+    .toLowerCase()
+}
+
+function eventCluster(event: TraceEventView): string {
+  const payload = isRecord(event.payload) ? event.payload : {}
+  return readString(payload, "cluster") ?? "devnet"
+}
+
+function explorerTxUrl(signature: string, cluster: string): string {
+  const normalized = cluster === "mainnet" || cluster === "mainnet-beta" ? null : cluster
+  const suffix = normalized === null ? "" : `?cluster=${normalized}`
+  return `https://explorer.solana.com/tx/${signature}${suffix}`
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key]
+  return typeof value === "number" && Number.isFinite(value) ? value : null
 }
 
 function formatJson(value: unknown): string {
@@ -872,6 +1077,37 @@ function formatDate(value: Date): string {
 
 function formatTime(value: Date): string {
   return value.toLocaleTimeString()
+}
+
+function formatOffset(start: Date, value: Date): string {
+  const deltaMs = Math.max(0, value.getTime() - start.getTime())
+  if (deltaMs < 1000) {
+    return `${deltaMs}ms`
+  }
+
+  return `${(deltaMs / 1000).toFixed(2)}s`
+}
+
+function formatRelative(value: Date): string {
+  const deltaMs = Date.now() - value.getTime()
+  const deltaSeconds = Math.round(deltaMs / 1000)
+
+  if (Math.abs(deltaSeconds) < 60) {
+    return "just now"
+  }
+
+  const minutes = Math.round(deltaSeconds / 60)
+  if (Math.abs(minutes) < 60) {
+    return `${minutes}m ago`
+  }
+
+  const hours = Math.round(minutes / 60)
+  if (Math.abs(hours) < 24) {
+    return `${hours}h ago`
+  }
+
+  const days = Math.round(hours / 24)
+  return `${days}d ago`
 }
 
 function formatDuration(value: number | null): string {
