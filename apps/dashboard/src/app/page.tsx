@@ -4,6 +4,7 @@
 import { LandingFlare } from "@/components/landing-flare"
 import { Mark } from "@/components/mortem/mark"
 import { Button } from "@/components/ui/button"
+import { ExternalLink } from "lucide-react"
 import Link from "next/link"
 
 const trustSignals = [
@@ -112,7 +113,7 @@ export default function LandingPage() {
           >
             <Mark size={32} alt="Mortem" className="-pl-0.5 -mr-1.5" />
             <span className="font-display text-3xl leading-none">
-              Mortem<span className="pl-0.5 text-[#DC2626] text-4xl">.</span>
+              Mortem<span className="pl-0.5 text-4xl text-signal">.</span>
             </span>
           </Link>
           <Button asChild variant="brand">
@@ -123,9 +124,9 @@ export default function LandingPage() {
         <section className="flex min-h-[calc(100vh-7rem)] flex-col items-center justify-center py-16 text-center md:py-20">
           <p className="eyebrow">For Solana Trading Bots</p>
           <h1 className="mt-6 max-w-4xl font-display text-5xl leading-[0.92] tracking-tight md:text-7xl lg:text-[5.8rem]">
-            Your bot made a bad trade<span className="text-[#DC2626]">.</span>
+            Your bot made a bad trade<span className="text-signal">.</span>
             <br />
-            Find out exactly why<span className="text-[#DC2626]">.</span>
+            Find out exactly why<span className="text-signal">.</span>
           </h1>
           <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground md:text-xl md:leading-8">
             Mortem traces every agent decision against real market conditions, shows you the exact
@@ -137,12 +138,24 @@ export default function LandingPage() {
               variant="brand"
               asChild
               size="lg"
-              className="px-8 text-xs font-semibold text-white hover:bg-ink hover:text-white hover:border-signal"
+              className="px-8 text-paper hover:border-signal hover:bg-ink hover:text-paper"
             >
-              <Link href="/app">Start Debugging</Link>
+              <Link href="/app">Start an autopsy</Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="px-8 text-xs font-semibold hover:bg-ink hover:text-white hover:border-signal">
-              <Link href="https://cal.com/ifeelsam">Book a Demo</Link>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="px-8 hover:border-signal hover:bg-ink hover:text-paper"
+            >
+              <Link
+                href="https://cal.com/ifeelsam"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Book a demo
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </Button>
           </div>
 

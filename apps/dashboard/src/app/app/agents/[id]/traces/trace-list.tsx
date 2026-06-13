@@ -137,56 +137,59 @@ function TraceListFrame({
 }>) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
-        <section className="border border-border bg-card text-card-foreground">
-          <div className="flex flex-col gap-4 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Trace history</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                Chronological sessions
-              </h1>
-            </div>
-            <div className="flex flex-wrap gap-2" aria-label="Trace status filters">
-              {(["all", "running", "completed", "errored", "timeout"] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className="inline-flex min-h-10 items-center border border-border px-3 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
-                  data-active={status === item}
-                  onClick={() => setStatus(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+      <section className="border border-line bg-ink-2 text-card-foreground">
+        <div className="flex flex-col gap-4 border-b border-line p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="eyebrow">Case ledger</p>
+            <h1 className="mt-2 font-display text-3xl leading-tight tracking-tight">
+              Trace history
+            </h1>
           </div>
-
-          <div className="divide-y divide-border">
-            {traces.map((trace) => (
-              <Link
-                key={trace.id}
-                href={`/app/traces/${trace.id}`}
-                className="grid gap-4 p-4 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:grid-cols-[minmax(0,1fr)_120px_120px_120px]"
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Trace status filters"
+          >
+            {(["all", "running", "completed", "errored", "timeout"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={status === item}
+                className="inline-flex min-h-9 items-center border border-line px-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:border-signal data-[active=true]:text-paper"
+                data-active={status === item}
+                onClick={() => setStatus(item)}
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
-                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                      {trace.id}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6">{trace.inputSummary}</p>
-                  <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                    {trace.startedAt.toLocaleString()}
-                  </p>
-                </div>
-                <TraceMetric label="Events" value={String(trace.eventCount)} />
-                <TraceMetric label="Tokens" value={String(trace.totalTokens)} />
-                <TraceMetric label="Txs" value={String(trace.solanaTxCount)} />
-              </Link>
+                {item}
+              </button>
             ))}
           </div>
-        </section>
+        </div>
+
+        <div className="divide-y divide-line">
+          {traces.map((trace) => (
+            <Link
+              key={trace.id}
+              href={`/app/traces/${trace.id}`}
+              className="grid gap-4 p-5 transition-colors hover:bg-ink-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:grid-cols-[minmax(0,1fr)_100px_100px_100px]"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
+                  <span className="font-mono text-xs tabular-nums text-fg-muted">{trace.id}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6">{trace.inputSummary}</p>
+                <p className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-fg-muted">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  {trace.startedAt.toLocaleString()}
+                </p>
+              </div>
+              <TraceMetric label="Events" value={String(trace.eventCount)} />
+              <TraceMetric label="Tokens" value={String(trace.totalTokens)} />
+              <TraceMetric label="Txs" value={String(trace.solanaTxCount)} />
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -224,8 +227,8 @@ function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
       aria-busy="true"
     >
       <div>
-        <section className="border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <section className="border border-line bg-ink-2 p-5">
+          <div className="flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
             <Filter className="h-4 w-4" aria-hidden="true" />
             Loading traces for {agentId}
           </div>
@@ -233,7 +236,7 @@ function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
             {[0, 1, 2].map((item) => (
               <div
                 key={item}
-                className="grid gap-4 border-t border-border pt-4 lg:grid-cols-[minmax(0,1fr)_120px_120px_120px]"
+                className="grid gap-4 border-t border-line pt-4 lg:grid-cols-[minmax(0,1fr)_100px_100px_100px]"
               >
                 <div className="space-y-3">
                   <div className="h-5 w-56 bg-ink-3" />
@@ -266,9 +269,9 @@ function TraceMessage({
 }>) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {actionLabel === undefined || onAction === undefined ? null : (
@@ -291,7 +294,7 @@ function TraceMessage({
 function TraceMetric({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-baseline justify-between gap-4 lg:block">
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
+      <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-fg-muted">{label}</p>
       <p className="mt-1 font-mono text-sm tabular-nums">{value}</p>
     </div>
   )

@@ -30,7 +30,7 @@ export function CopyButton({
   return (
     <Button type="button" variant="outline" size={size} onClick={() => void copy()}>
       <Copy className="h-4 w-4" aria-hidden="true" />
-      {copied ? "Copied" : label}
+      <span aria-live="polite">{copied ? "Filed." : label}</span>
     </Button>
   )
 }

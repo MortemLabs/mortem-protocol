@@ -296,9 +296,9 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
       <section className="grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Agent onboarding</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-normal">
-                {resumeAgentId === null ? "Add a new agent" : "Finish agent setup"}
+              <p className="eyebrow">Intake</p>
+              <h1 className="mt-2 font-display text-3xl leading-tight tracking-tight">
+                {resumeAgentId === null ? "File a new agent" : "Finish agent setup"}
               </h1>
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -456,7 +456,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <div>
-                      <h3 className="text-base font-semibold text-foreground">
+                      <h3 className="font-display text-lg leading-tight text-foreground">
                         Add one line to your agent
                       </h3>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -486,7 +486,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       language="typescript"
                       value={integrationExample.code}
                     />
-                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-black dark:text-black">
+                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal">
                       The verify token proves you control this agent. You can remove it from your
                       code after Mortem confirms the connection.
                     </div>
@@ -557,23 +557,17 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                 <div className="space-y-5">
                   <div className="flex items-start gap-3 border border-border bg-background p-4">
                     {isVerified ? (
-                      <CheckCircle2
-                        className="mt-0.5 h-5 w-5 text-emerald-600"
-                        aria-hidden="true"
-                      />
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 text-paper" aria-hidden="true" />
                     ) : timedOut ? (
-                      <span
-                        className="mt-1 h-3 w-3 rounded-full bg-ink-3-foreground"
-                        aria-hidden="true"
-                      />
+                      <span className="mt-1 h-3 w-3 bg-fg-muted" aria-hidden="true" />
                     ) : isWaitingForVerification ? (
                       <span
-                        className="mt-1 h-3 w-3 animate-pulse rounded-full bg-amber-500"
+                        className="mt-1 h-3 w-3 animate-pulse bg-signal"
                         aria-hidden="true"
                       />
                     ) : (
                       <span
-                        className="mt-1 h-3 w-3 animate-pulse rounded-full bg-primary"
+                        className="mt-1 h-3 w-3 animate-pulse bg-signal"
                         aria-hidden="true"
                       />
                     )}
@@ -616,11 +610,11 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       </p>
                       {connectionState?.firstSeenAt === null ||
                       connectionState?.firstSeenAt === undefined ? null : (
-                        <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-200">
+                        <p className="mt-2 text-sm text-muted-foreground">
                           First seen {formatDateTime(connectionState.firstSeenAt)}.
                         </p>
                       )}
-                      <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-200">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         You can remove <code>MORTEM_VERIFY_TOKEN</code> from your code now.
                       </p>
                       <div className="mt-4 flex flex-wrap gap-3">
@@ -727,16 +721,14 @@ function WizardStep({
   return (
     <section className="grid gap-4 md:grid-cols-[56px_minmax(0,1fr)]">
       <div className="relative flex justify-center">
-        <div className="absolute top-12 bottom-[-1.25rem] w-px bg-border last:hidden" />
+        <div className="absolute top-12 bottom-[-1.25rem] w-px bg-line last:hidden" />
         <div
+          aria-current={state === "active" ? "step" : undefined}
           className={cn(
-            "relative z-10 flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold",
-            state === "complete" &&
-              "bg-emerald-600 text-white shadow-[0_0_0_4px_hsl(var(--background))]",
-            state === "active" &&
-              "border-2 border-primary bg-background text-primary shadow-[0_0_0_4px_hsl(var(--background))]",
-            state === "future" &&
-              "border border-border bg-ink-3 text-muted-foreground shadow-[0_0_0_4px_hsl(var(--background))]",
+            "relative z-10 flex h-10 w-10 items-center justify-center font-mono text-sm shadow-[0_0_0_4px_hsl(var(--background))]",
+            state === "complete" && "bg-signal text-paper",
+            state === "active" && "border-2 border-signal bg-background text-paper",
+            state === "future" && "border border-line bg-ink-3 text-muted-foreground",
           )}
         >
           {state === "complete" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : number}
@@ -746,17 +738,15 @@ function WizardStep({
       <div
         className={cn(
           "border p-5",
-          state === "active" && "border-primary/30 bg-card",
-          state === "complete" && "border-border bg-card",
-          state === "future" && "border-border bg-ink-3/20 text-muted-foreground",
+          state === "active" && "border-signal/40 bg-ink-2",
+          state === "complete" && "border-line bg-ink-2",
+          state === "future" && "border-line bg-ink-3/20 text-muted-foreground",
         )}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
-              Step {number}
-            </p>
-            <h2 className="mt-2 text-xl font-semibold tracking-normal">{title}</h2>
+            <p className="eyebrow">Step {number}</p>
+            <h2 className="mt-2 font-display text-xl leading-tight">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
           </div>
 
@@ -774,7 +764,7 @@ function WizardStep({
 
         {state === "complete" ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+            <CheckCircle2 className="h-4 w-4 text-paper" aria-hidden="true" />
             <span>{summary}</span>
           </div>
         ) : (
@@ -840,8 +830,7 @@ function CopyBlock({
           onClick={() => void copy()}
           className={cn(
             "border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 hover:text-zinc-50",
-            copied &&
-              "border-emerald-500/25 bg-ink-3 text-emerald-200 hover:bg-emerald-500/15",
+            copied && "border-signal/40 bg-ink-3 text-paper hover:bg-ink-3",
           )}
         >
           {copied ? (
@@ -849,7 +838,7 @@ function CopyBlock({
           ) : (
             <Copy className="h-4 w-4" aria-hidden="true" />
           )}
-          {copied ? "Copied" : copyLabel}
+          <span aria-live="polite">{copied ? "Filed." : copyLabel}</span>
         </Button>
       </div>
       <pre className="overflow-x-auto bg-ink px-4 py-4 text-sm leading-7 text-zinc-100">
@@ -861,12 +850,10 @@ function CopyBlock({
 
 function SummaryGrid({ rows }: Readonly<{ rows: Array<[string, string]> }>) {
   return (
-    <div className="grid gap-3 border border-border bg-background p-4">
+    <div className="grid gap-3 border border-line bg-ink p-4">
       {rows.map(([label, value]) => (
         <div key={label}>
-          <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
-            {label}
-          </p>
+          <p className="eyebrow">{label}</p>
           <p className="mt-1 break-all font-mono text-xs text-foreground">{value}</p>
         </div>
       ))}

@@ -149,113 +149,113 @@ function AgentSettingsFrame({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8">
-        <section className="border border-border bg-card text-card-foreground">
-          <div className="border-b border-border p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-semibold tracking-normal">{agent.displayName}</h1>
-              <Badge variant={agent.privateMode ? "secondary" : "outline"}>
-                {agent.privateMode ? "private" : "shared"}
-              </Badge>
-              {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
-            </div>
-            <p className="mt-3 font-mono text-xs text-muted-foreground">{agent.id}</p>
+      <section className="border border-line bg-ink-2 text-card-foreground">
+        <div className="border-b border-line p-6">
+          <p className="eyebrow">Case configuration</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl leading-tight tracking-tight">
+              {agent.displayName}
+            </h1>
+            <Badge variant={agent.privateMode ? "secondary" : "outline"}>
+              {agent.privateMode ? "private" : "shared"}
+            </Badge>
+            {mode === "preview" ? <Badge variant="warning">preview</Badge> : null}
           </div>
+          <p className="mt-3 font-mono text-xs text-fg-muted">{agent.id}</p>
+        </div>
 
-          <div className="grid gap-px bg-border md:grid-cols-3">
-            <SettingsStat icon={Shield} label="Network" value={agent.environment} />
-            <SettingsStat
-              icon={CalendarClock}
-              label="Retention"
-              value={`${agent.retentionDays} days`}
-            />
-            <SettingsStat
-              icon={KeyRound}
-              label="API key hash"
-              value={shortenHash(agent.apiKeyHash)}
-            />
-          </div>
-        </section>
+        <div className="grid gap-px bg-line md:grid-cols-3">
+          <SettingsStat icon={Shield} label="Network" value={agent.environment} />
+          <SettingsStat
+            icon={CalendarClock}
+            label="Retention"
+            value={`${agent.retentionDays} days`}
+          />
+          <SettingsStat
+            icon={KeyRound}
+            label="API key hash"
+            value={shortenHash(agent.apiKeyHash)}
+          />
+        </div>
+      </section>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="border border-border bg-card p-6 text-card-foreground">
-            <h2 className="text-xl font-semibold tracking-normal">API key</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Rotate the ingest key when it is exposed or when an SDK host leaves your control.
-            </p>
-            <div className="mt-5 border border-border bg-background p-4">
-              <p className="text-xs font-medium text-muted-foreground">Stored hash</p>
-              <p className="mt-2 break-all font-mono text-xs">{agent.apiKeyHash}</p>
-            </div>
-            {latestApiKey === null ? null : (
-              <div className="mt-4 border border-line bg-ink-3 p-4 text-paper">
-                <p className="text-sm font-medium">New key</p>
-                <p className="mt-2 break-all font-mono text-xs">{latestApiKey}</p>
-                <div className="mt-3">
-                  <CopyButton label="Copy key" value={latestApiKey} />
-                </div>
-              </div>
-            )}
-            <div className="mt-5">
-              <Button
-                type="button"
-                disabled={onRotate === undefined || rotating}
-                onClick={onRotate}
-              >
-                {rotating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                )}
-                Rotate key
-              </Button>
-            </div>
-          </div>
-
-          <aside className="border border-border bg-card p-6 text-card-foreground">
-            <h2 className="text-xl font-semibold tracking-normal">Retention</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              This agent keeps trace payloads for {agent.retentionDays} days before policy cleanup.
-            </p>
-            <div className="mt-5 space-y-3">
-              <ReadonlyRow label="Anchoring mode" value="Solana memo transaction" />
-              <ReadonlyRow label="Signing flow" value="Backend signer pays the tx fee" />
-            </div>
-          </aside>
-        </section>
-
-        <section className="mt-6 border border-destructive/30 bg-card p-6 text-card-foreground">
-          <h2 className="text-xl font-semibold tracking-normal text-destructive">Danger zone</h2>
+      <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="border border-line bg-ink-2 p-6 text-card-foreground">
+          <h2 className="font-display text-xl leading-tight">API key</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Deleting an agent removes the database record and its linked traces.
+            Rotate the ingest key when it is exposed or when an SDK host leaves your control.
           </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={confirmDelete ? "destructive" : "outline"}
-              disabled={deleting}
-              onClick={() => {
-                if (!confirmDelete) {
-                  setConfirmDelete(true)
-                  return
-                }
-
-                onDelete?.()
-              }}
-            >
-              {deleting ? (
+          <div className="mt-5 border border-line bg-ink p-4">
+            <p className="eyebrow">Stored hash</p>
+            <p className="mt-2 break-all font-mono text-xs">{agent.apiKeyHash}</p>
+          </div>
+          {latestApiKey === null ? null : (
+            <div className="mt-4 border border-signal/50 bg-ink-3 p-4 text-paper">
+              <p className="eyebrow text-signal">New key — shown once</p>
+              <p className="mt-2 break-all font-mono text-xs">{latestApiKey}</p>
+              <div className="mt-3">
+                <CopyButton label="Copy key" value={latestApiKey} />
+              </div>
+            </div>
+          )}
+          <div className="mt-5">
+            <Button type="button" disabled={onRotate === undefined || rotating} onClick={onRotate}>
+              {rotating ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                <RefreshCcw className="h-4 w-4" aria-hidden="true" />
               )}
-              {confirmDelete ? "Confirm delete" : "Delete agent"}
+              Rotate key
             </Button>
-            {confirmDelete ? (
-              <Button type="button" variant="secondary" onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </Button>
-            ) : null}
           </div>
-        </section>
+        </div>
+
+        <aside className="border border-line bg-ink-2 p-6 text-card-foreground">
+          <h2 className="font-display text-xl leading-tight">Retention</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            This agent keeps trace payloads for {agent.retentionDays} days before policy cleanup.
+          </p>
+          <div className="mt-5 space-y-3">
+            <ReadonlyRow label="Anchoring mode" value="Solana memo transaction" />
+            <ReadonlyRow label="Signing flow" value="Backend signer pays the tx fee" />
+          </div>
+        </aside>
+      </section>
+
+      <section className="mt-6 border border-signal/40 bg-ink-2 p-6 text-card-foreground">
+        <p className="eyebrow text-signal">Final disposition</p>
+        <h2 className="mt-2 font-display text-xl leading-tight">Bury this agent</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Burial removes the database record and every linked trace. There is no exhumation.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={confirmDelete ? "destructive" : "outline"}
+            disabled={deleting}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true)
+                return
+              }
+
+              onDelete?.()
+            }}
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            {confirmDelete ? "Confirm burial" : "Bury agent"}
+          </Button>
+          {confirmDelete ? (
+            <Button type="button" variant="secondary" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      </section>
     </div>
   )
 }
@@ -267,7 +267,7 @@ function AgentSettingsSkeleton() {
       aria-busy="true"
     >
       <div>
-        <section className="border border-border bg-card p-6">
+        <section className="border border-line bg-ink-2 p-6">
           <div className="h-8 w-64 bg-ink-3" />
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             {[0, 1, 2].map((item) => (
@@ -293,9 +293,9 @@ function AgentSettingsMessage({
 }>) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {actionLabel === undefined || onAction === undefined ? null : (
@@ -325,11 +325,9 @@ function SettingsStat({
   value: string
 }>) {
   return (
-    <div className="bg-card p-4">
-      <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-      <p className="mt-3 text-xs font-medium uppercase tracking-normal text-muted-foreground">
-        {label}
-      </p>
+    <div className="bg-ink-2 p-4">
+      <Icon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
+      <p className="eyebrow mt-3">{label}</p>
       <p className="mt-2 break-all font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
@@ -337,8 +335,8 @@ function SettingsStat({
 
 function ReadonlyRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="border border-border bg-background p-3">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <div className="border border-line bg-ink p-3">
+      <p className="eyebrow">{label}</p>
       <p className="mt-2 break-all font-mono text-xs">{value}</p>
     </div>
   )

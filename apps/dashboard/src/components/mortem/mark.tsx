@@ -28,7 +28,7 @@ export function Wordmark({ className, size = 24 }: { className?: string; size?: 
     <span className={cn("inline-flex items-center gap-2 align-middle", className)}>
       <Mark size={size} alt="Mortem" />
       <span className="font-display text-2xl leading-none">
-        Mortem<span className=" text-[#DC2626]">.</span>
+        Mortem<span className="text-signal">.</span>
       </span>
     </span>
   )

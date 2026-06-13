@@ -1001,7 +1001,7 @@ function failureLabel(failureType: string): string {
     return "healthy"
   }
 
-  return failureType
+  return failureType.replace(/_/g, " ")
 }
 
 function verdictVariant(
