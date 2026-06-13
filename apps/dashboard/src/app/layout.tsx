@@ -25,9 +25,36 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 })
 
+const siteUrl = process.env.NEXT_PUBLIC_MORTEM_SITE_URL ?? "https://mortem.dev"
+
 export const metadata: Metadata = {
-  title: "Mortem",
-  description: "Forensic tools for onchain trading agents.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Mortem — Forensics for onchain trading agents",
+    template: "%s · Mortem",
+  },
+  description:
+    "Mortem files an autopsy on every agent run: full traces, cause of death, and the fix — before the next trade.",
+  applicationName: "Mortem",
+  icons: {
+    icon: "/mortem-icon.svg",
+    shortcut: "/mortem-icon.svg",
+    apple: "/mortem-icon.svg",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Mortem",
+    title: "Mortem — Forensics for onchain trading agents",
+    description:
+      "File an autopsy on every agent run: full traces, cause of death, and the fix — before the next trade.",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mortem — Forensics for onchain trading agents",
+    description:
+      "File an autopsy on every agent run: full traces, cause of death, and the fix — before the next trade.",
+  },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
