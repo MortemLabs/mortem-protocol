@@ -6,7 +6,7 @@
 import { Mark } from "@/components/mortem/mark"
 import { useDashboardAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { usePrivy } from "@privy-io/react-auth"
 import { ChevronRight, LogOut, Plus } from "lucide-react"
 import Link from "next/link"
@@ -73,10 +73,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                 Mortem<span className="pl-0.5 text-signal">.</span>
               </span>
             </Link>
-            <nav className="flex items-center gap-1 sm:gap-2" aria-label="Workspace">
-              <NavLink active={isAgentsActive(pathname)} href="/app">
-                Agents
-              </NavLink>
+            <nav className="flex items-center gap-2 sm:gap-3" aria-label="Workspace">
               <Button asChild size="sm">
                 <Link href="/app/agents/new">
                   <Plus className="h-4 w-4" aria-hidden="true" />
@@ -126,25 +123,6 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   )
 }
 
-function NavLink({
-  active,
-  children,
-  href,
-}: Readonly<{ active: boolean; children: ReactNode; href: string }>) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "inline-flex min-h-9 items-center px-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "text-paper" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </Link>
-  )
-}
-
 function AccountControl() {
   const { privyEnabled } = useDashboardAuth()
 
@@ -163,11 +141,11 @@ function AccountControl() {
 }
 
 function PrivyAccountControl() {
-  const { authenticated, login, logout, ready } = usePrivy()
+  const { authenticated, login, logout, ready, user } = usePrivy()
 
   if (!ready) {
     return (
-      <span className="inline-flex min-h-9 items-center px-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
+      <span className="inline-flex h-9 w-9 items-center justify-center border border-line font-mono text-[0.6875rem] text-fg-muted">
         …
       </span>
     )
@@ -181,16 +159,87 @@ function PrivyAccountControl() {
     )
   }
 
+  const handle = accountHandle(user)
+
   return (
-    <Button type="button" size="sm" variant="ghost" onClick={() => logout()}>
-      <LogOut className="h-4 w-4" aria-hidden="true" />
-      <span className="hidden sm:inline">Sign out</span>
-    </Button>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Account menu"
+          className="inline-flex items-center gap-2 border border-line bg-ink p-1 transition-colors hover:border-signal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Avatar seed={accountSeed(user) ?? handle} />
+          <span className="hidden max-w-32 truncate pr-1 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground sm:inline">
+            {handle}
+          </span>
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 min-w-56 border border-line bg-ink-2 p-1 text-card-foreground shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)]"
+        >
+          <div className="flex items-center gap-3 px-3 py-3">
+            <Avatar seed={accountSeed(user) ?? handle} size={36} />
+            <div className="min-w-0">
+              <p className="case-meta text-fg-muted">Signed in as</p>
+              <p className="mt-1 truncate font-mono text-xs text-paper">{handle}</p>
+            </div>
+          </div>
+          <DropdownMenu.Separator className="my-1 h-px bg-line" />
+          <DropdownMenu.Item asChild>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground outline-none transition-colors data-[highlighted]:bg-ink-3 data-[highlighted]:text-paper"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Sign out
+            </button>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   )
 }
 
-function isAgentsActive(pathname: string): boolean {
-  return pathname === "/app" || pathname.startsWith("/app/agents")
+function Avatar({ seed, size = 28 }: Readonly<{ seed: string; size?: number }>) {
+  // DiceBear "identicon" reads like an evidence fingerprint; grayscale keeps it on the ink/paper
+  // palette so each account stays unique without breaking the three-color brand.
+  const url = `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(seed)}&backgroundColor=transparent`
+
+  return (
+    <img
+      src={url}
+      alt=""
+      aria-hidden="true"
+      width={size}
+      height={size}
+      style={{ height: size, width: size }}
+      className="border border-line bg-ink object-cover grayscale contrast-125"
+    />
+  )
+}
+
+type PrivyUser = ReturnType<typeof usePrivy>["user"]
+
+function accountHandle(user: PrivyUser): string {
+  if (user?.email?.address !== undefined) {
+    return user.email.address
+  }
+
+  const wallet = user?.wallet?.address
+  if (wallet !== undefined) {
+    return shortId(wallet)
+  }
+
+  return "Investigator"
+}
+
+function accountSeed(user: PrivyUser): string | null {
+  return user?.id ?? user?.email?.address ?? user?.wallet?.address ?? null
 }
 
 function buildCrumbs(pathname: string, labels: Record<string, string>): Crumb[] {
