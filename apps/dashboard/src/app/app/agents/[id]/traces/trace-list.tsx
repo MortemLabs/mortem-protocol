@@ -57,34 +57,111 @@ type PreviewTrace = Pick<
 export function TraceList({ agentId }: Readonly<{ agentId: string }>) {
   const { privyEnabled } = useDashboardAuth()
   const [status, setStatus] = useState<StatusFilter>("all")
+  const [tag, setTag] = useState<string | null>(null)
+
+  const clearFilters = () => {
+    setStatus("all")
+    setTag(null)
+  }
 
   if (!privyEnabled) {
     return (
-      <TraceListFrame
+      <PreviewTraceList
         agentId={agentId}
-        traces={previewTraces}
         status={status}
         setStatus={setStatus}
+        tag={tag}
+        setTag={setTag}
+        onClearFilters={clearFilters}
       />
     )
   }
 
-  return <AuthenticatedTraceList agentId={agentId} status={status} setStatus={setStatus} />
+  return (
+    <AuthenticatedTraceList
+      agentId={agentId}
+      status={status}
+      setStatus={setStatus}
+      tag={tag}
+      setTag={setTag}
+      onClearFilters={clearFilters}
+    />
+  )
+}
+
+function PreviewTraceList({
+  agentId,
+  onClearFilters,
+  setStatus,
+  setTag,
+  status,
+  tag,
+}: Readonly<{
+  agentId: string
+  onClearFilters: () => void
+  setStatus: (status: StatusFilter) => void
+  setTag: (tag: string | null) => void
+  status: StatusFilter
+  tag: string | null
+}>) {
+  const tags = collectTags(previewTraces)
+  const visible = previewTraces.filter(
+    (trace) =>
+      (status === "all" || trace.status === status) && (tag === null || trace.tags.includes(tag)),
+  )
+
+  if (visible.length === 0) {
+    return (
+      <TraceEmpty
+        agentId={agentId}
+        status={status}
+        tag={tag}
+        onClearFilters={onClearFilters}
+      />
+    )
+  }
+
+  return (
+    <TraceListFrame
+      agentId={agentId}
+      traces={visible}
+      status={status}
+      setStatus={setStatus}
+      tag={tag}
+      setTag={setTag}
+      tags={tags}
+    />
+  )
 }
 
 function AuthenticatedTraceList({
   agentId,
+  onClearFilters,
   setStatus,
+  setTag,
   status,
+  tag,
 }: Readonly<{
   agentId: string
+  onClearFilters: () => void
   setStatus: (status: StatusFilter) => void
+  setTag: (tag: string | null) => void
   status: StatusFilter
+  tag: string | null
 }>) {
   const { authenticated, login, ready } = usePrivy()
-  const traces = trpc.traces.list.useQuery(
-    { agentId, limit: 25, status: status === "all" ? undefined : status },
-    { enabled: ready && authenticated, retry: 1 },
+  const traces = trpc.traces.list.useInfiniteQuery(
+    {
+      agentId,
+      limit: 25,
+      status: status === "all" ? undefined : status,
+      tag: tag ?? undefined,
+    },
+    {
+      enabled: ready && authenticated,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      retry: 1,
+    },
   )
 
   if (!ready || traces.isLoading) {
@@ -114,26 +191,51 @@ function AuthenticatedTraceList({
     )
   }
 
-  const traceRows = traces.data?.items ?? []
+  const traceRows = traces.data?.pages.flatMap((page) => page.items) ?? []
 
   if (traceRows.length === 0) {
-    return <TraceEmpty agentId={agentId} status={status} setStatus={setStatus} />
+    return (
+      <TraceEmpty agentId={agentId} status={status} tag={tag} onClearFilters={onClearFilters} />
+    )
   }
 
   return (
-    <TraceListFrame agentId={agentId} traces={traceRows} status={status} setStatus={setStatus} />
+    <TraceListFrame
+      agentId={agentId}
+      traces={traceRows}
+      status={status}
+      setStatus={setStatus}
+      tag={tag}
+      setTag={setTag}
+      tags={collectTags(traceRows)}
+      hasMore={traces.hasNextPage ?? false}
+      loadingMore={traces.isFetchingNextPage}
+      onLoadMore={() => void traces.fetchNextPage()}
+    />
   )
 }
 
 function TraceListFrame({
   agentId,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   setStatus,
+  setTag,
   status,
+  tag,
+  tags,
   traces,
 }: Readonly<{
   agentId: string
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore?: () => void
   setStatus: (status: StatusFilter) => void
+  setTag: (tag: string | null) => void
   status: StatusFilter
+  tag: string | null
+  tags: string[]
   traces: PreviewTrace[]
 }>) {
   return (
@@ -166,6 +268,39 @@ function TraceListFrame({
           </div>
         </div>
 
+        {tags.length === 0 ? null : (
+          <div
+            className="flex flex-wrap items-center gap-2 border-b border-line p-4"
+            role="group"
+            aria-label="Trace tag filters"
+          >
+            <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-fg-muted">
+              Tags
+            </span>
+            <button
+              type="button"
+              aria-pressed={tag === null}
+              data-active={tag === null}
+              onClick={() => setTag(null)}
+              className="inline-flex min-h-8 items-center border border-line px-2.5 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:border-signal data-[active=true]:text-paper"
+            >
+              all
+            </button>
+            {tags.map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={tag === item}
+                data-active={tag === item}
+                onClick={() => setTag(item)}
+                className="inline-flex min-h-8 items-center border border-line px-2.5 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:border-signal data-[active=true]:text-paper"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="divide-y divide-line">
           {traces.map((trace) => (
             <Link
@@ -190,17 +325,41 @@ function TraceListFrame({
             </Link>
           ))}
         </div>
+
+        {hasMore ? (
+          <div className="border-t border-line p-4">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loadingMore}
+              onClick={onLoadMore}
+            >
+              {loadingMore ? <RefreshCcw className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+              Load older traces
+            </Button>
+          </div>
+        ) : null}
       </section>
     </div>
   )
 }
 
+function collectTags(traces: PreviewTrace[]): string[] {
+  return Array.from(new Set(traces.flatMap((trace) => trace.tags))).sort()
+}
+
 function TraceEmpty({
   agentId,
-  setStatus,
+  onClearFilters,
   status,
-}: Readonly<{ agentId: string; setStatus: (status: StatusFilter) => void; status: StatusFilter }>) {
-  if (status === "all") {
+  tag,
+}: Readonly<{
+  agentId: string
+  onClearFilters: () => void
+  status: StatusFilter
+  tag: string | null
+}>) {
+  if (status === "all" && tag === null) {
     return (
       <TraceMessage
         agentId={agentId}
@@ -213,10 +372,10 @@ function TraceEmpty({
   return (
     <TraceMessage
       agentId={agentId}
-      title="No traces match this filter."
-      description="Start a Mortem SDK session from your agent and completed traces will appear here."
-      actionLabel="Clear filter"
-      onAction={() => setStatus("all")}
+      title="No traces match these filters."
+      description="Loosen the status or tag filters to see more of the case ledger."
+      actionLabel="Clear filters"
+      onAction={onClearFilters}
     />
   )
 }

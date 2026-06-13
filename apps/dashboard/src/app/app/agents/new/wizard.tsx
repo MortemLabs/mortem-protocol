@@ -95,10 +95,12 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   const [displayName, setDisplayName] = useState("yield-hunter-v2")
   const [activeIntegrationTab, setActiveIntegrationTab] = useState<IntegrationTab>("openai")
   const [isAssistantPromptOpen, setIsAssistantPromptOpen] = useState(false)
+  const [nameTouched, setNameTouched] = useState(false)
+  const [credentialsAcknowledged, setCredentialsAcknowledged] = useState(false)
   const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(
     mode === "preview" ? previewAgent : null,
   )
-  const [localError, setLocalError] = useState<string | null>(null)
+  const [, setLocalError] = useState<string | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const connectionPollRef = useRef<number | null>(null)
   const pollingStartedAtRef = useRef<number | null>(null)
@@ -333,24 +335,39 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                       id="agent-name"
                       value={displayName}
                       onChange={(event) => setDisplayName(event.currentTarget.value)}
+                      onBlur={() => setNameTouched(true)}
                       placeholder="yield-hunter-v2"
-                      className="mt-2 h-11 w-full border border-input bg-background px-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      aria-invalid={nameTouched && nameError !== null}
+                      aria-describedby="agent-name-help"
+                      className={cn(
+                        "mt-2 h-11 w-full border bg-background px-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        nameTouched && nameError !== null ? "border-signal" : "border-input",
+                      )}
                       autoComplete="off"
                       spellCheck={false}
                     />
                   </label>
-                  <p className="text-sm text-muted-foreground">
-                    Used to identify this agent in your dashboard. No spaces.
-                  </p>
-                  {localError === null && createAgent.error === null ? null : (
-                    <p className="text-sm text-destructive">
-                      {localError ?? createAgent.error?.message ?? "Could not create the agent."}
+                  {nameTouched && nameError !== null ? (
+                    <p id="agent-name-help" className="text-sm text-signal">
+                      {nameError}
+                    </p>
+                  ) : (
+                    <p id="agent-name-help" className="text-sm text-muted-foreground">
+                      Used to identify this agent in your dashboard. No spaces.
+                    </p>
+                  )}
+                  {createAgent.error === null ? null : (
+                    <p className="text-sm text-signal">
+                      {createAgent.error.message ?? "Could not create the agent."}
                     </p>
                   )}
                   <Button
                     type="button"
-                    onClick={() => void submitStepOne()}
-                    disabled={createAgent.isPending}
+                    onClick={() => {
+                      setNameTouched(true)
+                      void submitStepOne()
+                    }}
+                    disabled={createAgent.isPending || nameError !== null}
                   >
                     {createAgent.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -413,17 +430,33 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                     language="dotenv"
                     value={`MORTEM_API_KEY=${createdAgent.apiKey ?? "<shown-once>"}\nMORTEM_AGENT_ID=${createdAgent.id}\nMORTEM_VERIFY_TOKEN=${createdAgent.verifyToken ?? "<shown-once>"}\nMORTEM_INGEST_URL=${ingestUrl}`}
                   />
-                  {hasVerifyCredentials ? null : (
-                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal dark:text-signal">
+                  {hasVerifyCredentials ? (
+                    <label className="flex items-start gap-3 border border-signal/40 bg-ink-3 p-4 text-sm leading-6 text-paper">
+                      <input
+                        type="checkbox"
+                        checked={credentialsAcknowledged}
+                        onChange={(event) =>
+                          setCredentialsAcknowledged(event.currentTarget.checked)
+                        }
+                        className="mt-1 h-4 w-4 accent-signal"
+                      />
+                      <span>
+                        I have copied the API key and verify token. They are shown once and cannot be
+                        retrieved later.
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal">
                       The API key and verify token are only shown when the agent is first created.
                       If you already added them, continue to the verification step below.
                     </div>
                   )}
                   <Button
                     type="button"
+                    disabled={hasVerifyCredentials && !credentialsAcknowledged}
                     onClick={() => setCurrentStep(hasVerifyCredentials ? 3 : 4)}
                   >
-                    {hasVerifyCredentials ? "I've added this" : "Continue to verification"}
+                    {hasVerifyCredentials ? "I've stored these" : "Continue to verification"}
                   </Button>
                 </div>
               )}
