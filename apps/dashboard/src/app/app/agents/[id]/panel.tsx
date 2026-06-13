@@ -332,10 +332,14 @@ function PerformancePanel({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <p className="eyebrow">02 · Performance ledger</p>
-            <h2 className="mt-2 font-display text-3xl leading-tight">Cumulative P/L</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-3xl leading-tight">Cumulative P/L</h2>
+              <Badge variant="warning">Synthetic</Badge>
+            </div>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Read the pulse before the autopsy. The curve is reconstructed from filed run outcomes
-              until explicit trade P/L lands in trace payloads.
+              Read the pulse before the autopsy. This curve is a synthetic proxy reconstructed from
+              filed run outcomes — not booked trade P/L — until explicit trade results land in trace
+              payloads.
             </p>
           </div>
           <div className="flex flex-wrap gap-2" aria-label="Performance timeframe">
@@ -406,7 +410,7 @@ function PerformancePanel({
 
           <div className="space-y-3">
             <MetricCard
-              label="Current P/L"
+              label="Synthetic P/L"
               value={formatCurrency(performance.currentPnl)}
               tone={metricTone(performance.currentPnl)}
             />
@@ -1082,12 +1086,14 @@ function roundMetric(value: number): number {
 function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>) {
   const { authenticated, getAccessToken } = usePrivy()
   const [connected, setConnected] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState("")
   const [focusedIndex, setFocusedIndex] = useState(0)
   const [follow, setFollow] = useState(true)
   const [rows, setRows] = useState<LiveTraceRow[]>([])
   const listEndRef = useRef<HTMLDivElement | null>(null)
+  const listContainerRef = useRef<HTMLDivElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -1097,8 +1103,27 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
 
     const controller = new AbortController()
     let cancelled = false
+    let attempt = 0
+    let reconnectTimer: number | null = null
+
+    const scheduleReconnect = () => {
+      if (cancelled) {
+        return
+      }
+
+      // Exponential backoff, capped at 30s, so a flapping ingest does not hammer the server.
+      const delay = Math.min(30_000, 1_000 * 2 ** attempt)
+      attempt += 1
+      reconnectTimer = window.setTimeout(() => void connect(), delay)
+    }
 
     const connect = async () => {
+      if (cancelled) {
+        return
+      }
+
+      setConnecting(true)
+
       try {
         const token = await getAccessToken()
         const response = await fetch(`${ingestUrl}/v1/agents/${agentId}/live`, {
@@ -1107,11 +1132,17 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
         })
 
         if (!response.ok || response.body === null) {
-          setError("Live stream is unavailable.")
+          setConnecting(false)
+          setConnected(false)
+          setError("Live stream is unavailable. Retrying…")
+          scheduleReconnect()
           return
         }
 
+        attempt = 0
+        setConnecting(false)
         setConnected(true)
+        setError(null)
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ""
@@ -1143,13 +1174,17 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
             }
           }
         }
-      } catch (streamError) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(streamError))
-        }
-      } finally {
+
         if (!cancelled) {
           setConnected(false)
+          scheduleReconnect()
+        }
+      } catch (streamError) {
+        if (!controller.signal.aborted && !cancelled) {
+          setConnected(false)
+          setConnecting(false)
+          setError(errorMessage(streamError))
+          scheduleReconnect()
         }
       }
     }
@@ -1159,6 +1194,9 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
     return () => {
       cancelled = true
       controller.abort()
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+      }
     }
   }, [agentId, authenticated, getAccessToken])
 
@@ -1182,6 +1220,11 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
       listEndRef.current?.scrollIntoView({ block: "nearest" })
     }
   }, [follow, visibleRowCount])
+
+  useEffect(() => {
+    const focused = listContainerRef.current?.querySelector<HTMLElement>('[data-focused="true"]')
+    focused?.scrollIntoView({ block: "nearest" })
+  }, [focusedIndex])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1221,11 +1264,14 @@ function AuthenticatedLiveStreamPanel({ agentId }: Readonly<{ agentId: string }>
 
   return (
     <LiveStreamFrame
+      atCapacity={rows.length >= 100}
       connected={connected}
+      connecting={connecting}
       error={error}
       filter={filter}
       focusedIndex={focusedIndex}
       follow={follow}
+      listContainerRef={listContainerRef}
       listEndRef={listEndRef}
       rows={visibleRows}
       searchRef={searchRef}
@@ -1241,6 +1287,7 @@ function PreviewLiveStreamPanel() {
   const [focusedIndex, setFocusedIndex] = useState(0)
   const [follow, setFollow] = useState(true)
   const listEndRef = useRef<HTMLDivElement | null>(null)
+  const listContainerRef = useRef<HTMLDivElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
   const rows = [
     {
@@ -1259,11 +1306,14 @@ function PreviewLiveStreamPanel() {
 
   return (
     <LiveStreamFrame
+      atCapacity={false}
       connected
+      connecting={false}
       error={null}
       filter={filter}
       focusedIndex={focusedIndex}
       follow={follow}
+      listContainerRef={listContainerRef}
       listEndRef={listEndRef}
       rows={rows}
       searchRef={searchRef}
@@ -1275,11 +1325,14 @@ function PreviewLiveStreamPanel() {
 }
 
 function LiveStreamFrame({
+  atCapacity,
   connected,
+  connecting,
   error,
   filter,
   focusedIndex,
   follow,
+  listContainerRef,
   listEndRef,
   rows,
   searchRef,
@@ -1287,11 +1340,14 @@ function LiveStreamFrame({
   setFocusedIndex,
   setFollow,
 }: Readonly<{
+  atCapacity: boolean
   connected: boolean
+  connecting: boolean
   error: string | null
   filter: string
   focusedIndex: number
   follow: boolean
+  listContainerRef: RefObject<HTMLDivElement | null>
   listEndRef: RefObject<HTMLDivElement | null>
   rows: LiveTraceRow[]
   searchRef: RefObject<HTMLInputElement | null>
@@ -1299,6 +1355,8 @@ function LiveStreamFrame({
   setFocusedIndex: (index: number) => void
   setFollow: (value: boolean) => void
 }>) {
+  const status = connected ? "pulse" : connecting ? "connecting" : "flatline"
+
   return (
     <aside className="border border-line bg-ink-2 p-5 text-card-foreground">
       <div className="flex items-center justify-between gap-3">
@@ -1306,8 +1364,8 @@ function LiveStreamFrame({
           <Radio className="h-4 w-4 text-signal" aria-hidden="true" />
           <h2 className="font-display text-xl leading-none">Live stream</h2>
         </div>
-        <Badge variant={connected ? "success" : "warning"}>
-          {connected ? "Pulse" : "Flatline"}
+        <Badge variant={status === "pulse" ? "success" : status === "connecting" ? "secondary" : "warning"}>
+          {status === "pulse" ? "Pulse" : status === "connecting" ? "Connecting" : "Flatline"}
         </Badge>
       </div>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -1341,10 +1399,20 @@ function LiveStreamFrame({
         </div>
       )}
 
-      <div className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1">
+      {atCapacity ? (
+        <div className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-muted-foreground">
+          Showing the last 100 traces
+        </div>
+      ) : null}
+
+      <div ref={listContainerRef} className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1">
         {rows.length === 0 ? (
           <div className="border border-line p-3 text-sm text-muted-foreground">
-            Measuring pulse&hellip;
+            {connected
+              ? "Measuring pulse — no traces yet."
+              : connecting
+                ? "Connecting to ingest…"
+                : "Flatlined. Waiting to reconnect…"}
           </div>
         ) : (
           rows.map((row, index) => (
