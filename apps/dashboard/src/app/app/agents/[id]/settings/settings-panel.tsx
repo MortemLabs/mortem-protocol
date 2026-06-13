@@ -2,6 +2,7 @@
 // deletion. Raw API keys are only displayed immediately after a successful rotation.
 "use client"
 
+import { CopyButton } from "@/components/mortem/copy-button"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,6 @@ import type { inferRouterOutputs } from "@trpc/server"
 import {
   AlertCircle,
   CalendarClock,
-  Copy,
   KeyRound,
   Loader2,
   RefreshCcw,
@@ -120,32 +120,42 @@ function AuthenticatedAgentSettings({ agentId }: Readonly<{ agentId: string }>) 
       agent={toAgentSettingsView(agent.data)}
       latestApiKey={latestApiKey}
       mode="private"
+      onClearKey={() => setLatestApiKey(null)}
       onDelete={() => deleteAgent.mutate({ id: agentId })}
       onRotate={() => rotateKey.mutate({ id: agentId })}
       deleting={deleteAgent.isPending}
+      deleteError={deleteAgent.error?.message ?? null}
       rotating={rotateKey.isPending}
+      rotateError={rotateKey.error?.message ?? null}
     />
   )
 }
 
 function AgentSettingsFrame({
   agent,
+  deleteError = null,
   deleting = false,
   latestApiKey = null,
   mode,
+  onClearKey,
   onDelete,
   onRotate,
+  rotateError = null,
   rotating = false,
 }: Readonly<{
   agent: AgentSettingsView
+  deleteError?: string | null
   deleting?: boolean
   latestApiKey?: string | null
   mode: "preview" | "private"
+  onClearKey?: () => void
   onDelete?: () => void
   onRotate?: () => void
+  rotateError?: string | null
   rotating?: boolean
 }>) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmRotate, setConfirmRotate] = useState(false)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8">
@@ -183,30 +193,60 @@ function AgentSettingsFrame({
         <div className="border border-line bg-ink-2 p-6 text-card-foreground">
           <h2 className="font-display text-xl leading-tight">API key</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Rotate the ingest key when it is exposed or when an SDK host leaves your control.
+            Rotate the ingest key when it is exposed or when an SDK host leaves your control. The old
+            key stops working the moment a new one is issued.
           </p>
           <div className="mt-5 border border-line bg-ink p-4">
             <p className="eyebrow">Stored hash</p>
-            <p className="mt-2 break-all font-mono text-xs">{agent.apiKeyHash}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="break-all font-mono text-xs">{shortenHash(agent.apiKeyHash)}</p>
+              <CopyButton label="Copy hash" size="sm" value={agent.apiKeyHash} />
+            </div>
           </div>
           {latestApiKey === null ? null : (
             <div className="mt-4 border border-signal/50 bg-ink-3 p-4 text-paper">
               <p className="eyebrow text-signal">New key — shown once</p>
               <p className="mt-2 break-all font-mono text-xs">{latestApiKey}</p>
-              <div className="mt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <CopyButton label="Copy key" value={latestApiKey} />
+                <Button type="button" variant="secondary" size="sm" onClick={onClearKey}>
+                  I saved it — hide
+                </Button>
               </div>
             </div>
           )}
-          <div className="mt-5">
-            <Button type="button" disabled={onRotate === undefined || rotating} onClick={onRotate}>
+          {rotateError === null ? null : (
+            <p className="mt-4 border border-signal/40 bg-ink p-3 text-sm text-signal">
+              {rotateError}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={confirmRotate ? "destructive" : "default"}
+              disabled={onRotate === undefined || rotating}
+              onClick={() => {
+                if (!confirmRotate) {
+                  setConfirmRotate(true)
+                  return
+                }
+
+                setConfirmRotate(false)
+                onRotate?.()
+              }}
+            >
               {rotating ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
                 <RefreshCcw className="h-4 w-4" aria-hidden="true" />
               )}
-              Rotate key
+              {confirmRotate ? "Confirm rotation" : "Rotate key"}
             </Button>
+            {confirmRotate ? (
+              <Button type="button" variant="secondary" onClick={() => setConfirmRotate(false)}>
+                Cancel
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -228,6 +268,11 @@ function AgentSettingsFrame({
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Burial removes the database record and every linked trace. There is no exhumation.
         </p>
+        {deleteError === null ? null : (
+          <p className="mt-4 border border-signal/40 bg-ink p-3 text-sm text-signal">
+            {deleteError}
+          </p>
+        )}
         <div className="mt-5 flex flex-wrap gap-2">
           <Button
             type="button"
@@ -339,27 +384,6 @@ function ReadonlyRow({ label, value }: Readonly<{ label: string; value: string }
       <p className="eyebrow">{label}</p>
       <p className="mt-2 break-all font-mono text-xs">{value}</p>
     </div>
-  )
-}
-
-function CopyButton({ label, value }: Readonly<{ label: string; value: string }>) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <Button type="button" variant="outline" onClick={copy}>
-      <Copy className="h-4 w-4" aria-hidden="true" />
-      {copied ? "Copied" : label}
-    </Button>
   )
 }
 
