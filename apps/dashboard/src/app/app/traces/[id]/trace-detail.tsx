@@ -2,6 +2,7 @@
 // a three-panel layout. It keeps sharing and clipboard actions client-side for fast debugging.
 "use client"
 
+import { useRegisterCrumb } from "@/components/app-shell"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { CopyButton } from "@/components/mortem/copy-button"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +11,6 @@ import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
 import {
   AlertCircle,
-  ArrowLeft,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -288,6 +288,7 @@ function TraceDetailFrame({
 }>) {
   const [focusedEventId, setFocusedEventId] = useState<string | null>(trace.events[0]?.id ?? null)
   const [origin, setOrigin] = useState("")
+  useRegisterCrumb(trace.id, trace.inputSummary)
 
   useEffect(() => {
     setFocusedEventId(trace.events[0]?.id ?? null)
@@ -313,19 +314,14 @@ function TraceDetailFrame({
         : `${origin}/share/${trace.shareToken}`
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-[1800px] px-4 py-6 md:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild variant="ghost">
-            <Link href={`/app/agents/${trace.agentId}/traces`}>
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Traces
-            </Link>
-          </Button>
-          {preview ? <Badge variant="outline">preview data</Badge> : null}
-        </div>
+    <div className="mx-auto max-w-[1800px] px-4 py-8 md:px-6 lg:px-8">
+        {preview ? (
+          <div className="mb-4 flex justify-end">
+            <Badge variant="outline">preview data</Badge>
+          </div>
+        ) : null}
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
+        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
           <TraceMetadataPanel
             onShare={onShare}
             onUnshare={onUnshare}
@@ -341,8 +337,7 @@ function TraceDetailFrame({
           />
           <TraceInspectorPanel event={focusedEvent} trace={trace} />
         </div>
-      </div>
-    </main>
+    </div>
   )
 }
 
@@ -654,13 +649,12 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
 
 function TraceDetailSkeleton() {
   return (
-    <main
-      className="min-h-screen bg-background px-4 py-6 text-foreground md:px-6 lg:px-8"
+    <div
+      className="mx-auto max-w-[1800px] px-4 py-8 md:px-6 lg:px-8"
       aria-busy="true"
     >
-      <div className="mx-auto max-w-[1800px]">
-        <div className="h-10 w-28 bg-ink-3" />
-        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
+      <div>
+        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
           {[0, 1, 2].map((panel) => (
             <section key={panel} className="border border-line bg-ink-2 p-4">
               <div className="h-6 w-40 bg-ink-3" />
@@ -673,7 +667,7 @@ function TraceDetailSkeleton() {
           ))}
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -689,7 +683,7 @@ function TraceDetailMessage({
   title: string
 }>) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
       <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
         <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
@@ -708,7 +702,7 @@ function TraceDetailMessage({
           </Button>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
 

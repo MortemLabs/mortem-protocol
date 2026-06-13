@@ -9,7 +9,6 @@ import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
 import {
   AlertCircle,
-  ArrowLeft,
   CalendarClock,
   Copy,
   KeyRound,
@@ -149,16 +148,8 @@ function AgentSettingsFrame({
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 lg:px-8">
-        <Button asChild variant="ghost">
-          <Link href={`/app/agents/${agent.id}`}>
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Agent
-          </Link>
-        </Button>
-
-        <section className="mt-6 border border-border bg-card text-card-foreground">
+    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8">
+        <section className="border border-border bg-card text-card-foreground">
           <div className="border-b border-border p-6">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-3xl font-semibold tracking-normal">{agent.displayName}</h1>
@@ -265,20 +256,18 @@ function AgentSettingsFrame({
             ) : null}
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   )
 }
 
 function AgentSettingsSkeleton() {
   return (
-    <main
-      className="min-h-screen bg-background px-4 py-6 text-foreground md:px-6 lg:px-8"
+    <div
+      className="mx-auto max-w-5xl px-4 py-8 md:px-6 lg:px-8"
       aria-busy="true"
     >
-      <div className="mx-auto max-w-5xl">
-        <div className="h-10 w-28 bg-ink-3" />
-        <section className="mt-6 border border-border bg-card p-6">
+      <div>
+        <section className="border border-border bg-card p-6">
           <div className="h-8 w-64 bg-ink-3" />
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             {[0, 1, 2].map((item) => (
@@ -287,7 +276,7 @@ function AgentSettingsSkeleton() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -303,7 +292,7 @@ function AgentSettingsMessage({
   title: string
 }>) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
       <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
@@ -322,7 +311,7 @@ function AgentSettingsMessage({
           </Button>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
 

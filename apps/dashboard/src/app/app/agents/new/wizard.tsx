@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 import { usePrivy } from "@privy-io/react-auth"
 import {
   AlertCircle,
-  ArrowLeft,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -293,16 +292,8 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <Button asChild variant="ghost">
-          <Link href="/app">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Agents
-          </Link>
-        </Button>
-
-        <section className="mt-6 grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+      <section className="grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Agent onboarding</p>
@@ -712,8 +703,7 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
             </WizardStep>
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   )
 }
 
@@ -896,10 +886,10 @@ function WizardMessage({
   title: string
 }>) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
-        <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
+      <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
+        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {actionLabel === undefined || onAction === undefined ? null : (
@@ -912,7 +902,7 @@ function WizardMessage({
           </Button>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
 

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
-import { AlertCircle, ArrowLeft, Clock, Filter, RefreshCcw } from "lucide-react"
+import { AlertCircle, Clock, Filter, RefreshCcw } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import type { AppRouter } from "../../../../../../../server/src/server/root"
@@ -136,16 +136,8 @@ function TraceListFrame({
   traces: PreviewTrace[]
 }>) {
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <Button asChild variant="ghost">
-          <Link href={`/app/agents/${agentId}`}>
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Agent
-          </Link>
-        </Button>
-
-        <section className="mt-6 border border-border bg-card text-card-foreground">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+        <section className="border border-border bg-card text-card-foreground">
           <div className="flex flex-col gap-4 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Trace history</p>
@@ -195,8 +187,7 @@ function TraceListFrame({
             ))}
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   )
 }
 
@@ -228,13 +219,12 @@ function TraceEmpty({
 
 function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
   return (
-    <main
-      className="min-h-screen bg-background px-4 py-6 text-foreground md:px-6 lg:px-8"
+    <div
+      className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8"
       aria-busy="true"
     >
-      <div className="mx-auto max-w-7xl">
-        <div className="h-10 w-28 bg-ink-3" />
-        <section className="mt-6 border border-border bg-card p-4">
+      <div>
+        <section className="border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Filter className="h-4 w-4" aria-hidden="true" />
             Loading traces for {agentId}
@@ -257,7 +247,7 @@ function TraceListSkeleton({ agentId }: Readonly<{ agentId: string }>) {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -275,7 +265,7 @@ function TraceMessage({
   title: string
 }>) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
       <section className="w-full max-w-md border border-border bg-card p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-4 text-xl font-semibold tracking-normal">{title}</h1>
@@ -294,7 +284,7 @@ function TraceMessage({
           </Button>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
 

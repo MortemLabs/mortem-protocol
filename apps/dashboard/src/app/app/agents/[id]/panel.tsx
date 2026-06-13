@@ -3,6 +3,7 @@
 // existing Mortem chrome and live stream posture.
 "use client"
 
+import { useRegisterCrumb } from "@/components/app-shell"
 import {
   PnLChart,
   type PnLChartAnnotation,
@@ -16,7 +17,6 @@ import { usePrivy } from "@privy-io/react-auth"
 import type { inferRouterOutputs } from "@trpc/server"
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRight,
   Radio,
   ReceiptText,
@@ -186,18 +186,11 @@ function AgentDetailFrame({
   traceHistory: TraceHistoryRow[]
 }>) {
   const performance = useMemo(() => buildAgentPerformance(agent, traceHistory), [agent, traceHistory])
+  useRegisterCrumb(agent.id, agent.displayName)
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <Button asChild variant="ghost">
-          <Link href="/app">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Agents
-          </Link>
-        </Button>
-
-        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <div className="border border-line bg-ink-2 p-6 text-card-foreground">
               <p className="eyebrow">Agent dossier</p>
@@ -280,14 +273,13 @@ function AgentDetailFrame({
             />
           </div>
 
-          {mode === "private" ? (
-            <AuthenticatedLiveStreamPanel agentId={agent.id} />
-          ) : (
-            <PreviewLiveStreamPanel />
-          )}
-        </section>
-      </div>
-    </main>
+        {mode === "private" ? (
+          <AuthenticatedLiveStreamPanel agentId={agent.id} />
+        ) : (
+          <PreviewLiveStreamPanel />
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -1510,13 +1502,12 @@ function statusVariant(
 
 function AgentDetailSkeleton() {
   return (
-    <main
-      className="min-h-screen bg-background px-4 py-6 text-foreground md:px-6 lg:px-8"
+    <div
+      className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8"
       aria-busy="true"
     >
-      <div className="mx-auto max-w-7xl">
-        <div className="h-10 w-28 bg-ink-3" />
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <div className="min-h-64 border border-line bg-ink-2 p-6">
               <div className="h-8 w-64 bg-ink-3" />
@@ -1543,7 +1534,7 @@ function AgentDetailSkeleton() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -1559,7 +1550,7 @@ function AgentMessage({
   title: string
 }>) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-10 md:px-6">
       <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
         <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
         <h1 className="mt-4 font-display text-2xl leading-tight">{title}</h1>
@@ -1575,6 +1566,6 @@ function AgentMessage({
           </Button>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
