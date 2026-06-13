@@ -9,6 +9,7 @@ import {
   type PnLChartAnnotation,
   type PnLChartPoint,
 } from "@/components/mortem/pnl-chart"
+import { formatDate, formatTime } from "@/components/mortem/trace-format"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -259,7 +260,9 @@ function AgentDetailFrame({
                   value={
                     performanceState === "loading"
                       ? "Measuring pulse"
-                      : performance.lastActivityAt?.toLocaleString() ?? "No pulse filed"
+                      : performance.lastActivityAt
+                        ? formatDate(performance.lastActivityAt)
+                        : "No pulse filed"
                   }
                 />
               </div>
@@ -436,7 +439,11 @@ function PerformancePanel({
             <MetricCard
               label="Last activity"
               value={performance.lastActivityLabel}
-              detail={performance.lastActivityAt?.toLocaleString() ?? "No pulse filed"}
+              detail={
+                performance.lastActivityAt
+                  ? formatDate(performance.lastActivityAt)
+                  : "No pulse filed"
+              }
             />
             <MetricCard label="Case note" value={performance.note} multiline />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -478,7 +485,7 @@ function RecentFilingsCard({ runs }: Readonly<{ runs: TraceHistoryRow[] }>) {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={statusVariant(trace.status)}>{trace.status}</Badge>
-                <span className="case-meta text-fg-muted">{trace.startedAt.toLocaleString()}</span>
+                <span className="case-meta text-fg-muted">{formatDate(trace.startedAt)}</span>
               </div>
               <p className="mt-2 text-sm leading-6">{trace.inputSummary}</p>
               <div className="mt-2 flex flex-wrap gap-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-fg-muted">
@@ -592,6 +599,7 @@ function TimeframeButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={cn(
         "inline-flex min-h-10 items-center border px-3 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
         active ? "border-signal bg-ink text-paper" : "border-line text-muted-foreground hover:bg-ink",
@@ -950,8 +958,10 @@ function formatPercent(value: number | null): string {
   return `${Math.round(value * 100)}%`
 }
 
+const countFormat = new Intl.NumberFormat("en-US")
+
 function formatCount(value: number): string {
-  return value.toLocaleString()
+  return countFormat.format(value)
 }
 
 function formatRelativeTime(value: Date | null): string {
@@ -976,11 +986,14 @@ function formatRelativeTime(value: Date | null): string {
   return rtf.format(Math.round(diffMs / day), "day")
 }
 
+const chartLabelFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+})
+
 function formatChartLabel(value: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-  }).format(value)
+  return chartLabelFormat.format(value)
 }
 
 function createPreviewTraceHistory(agentId: string): TraceHistoryRow[] {
@@ -1368,6 +1381,10 @@ function LiveStreamFrame({
           {status === "pulse" ? "Pulse" : status === "connecting" ? "Connecting" : "Flatline"}
         </Badge>
       </div>
+      <span className="sr-only" role="status" aria-live="polite">
+        Live stream{" "}
+        {status === "pulse" ? "connected" : status === "connecting" ? "connecting" : "disconnected"}
+      </span>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
         Follow new trace batches from ingest as they arrive.
       </p>
@@ -1405,7 +1422,14 @@ function LiveStreamFrame({
         </div>
       ) : null}
 
-      <div ref={listContainerRef} className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1">
+      <div
+        ref={listContainerRef}
+        role="log"
+        aria-label="Live trace feed"
+        aria-live="polite"
+        aria-relevant="additions"
+        className="mt-5 max-h-[440px] space-y-3 overflow-y-auto pr-1"
+      >
         {rows.length === 0 ? (
           <div className="border border-line p-3 text-sm text-muted-foreground">
             {connected
@@ -1431,7 +1455,7 @@ function LiveStreamFrame({
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <span>{row.eventCount} events</span>
                 <span>{row.totalTokens} tokens</span>
-                <span>{row.receivedAt.toLocaleTimeString()}</span>
+                <span>{formatTime(row.receivedAt)}</span>
               </div>
             </Link>
           ))

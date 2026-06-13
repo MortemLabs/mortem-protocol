@@ -223,8 +223,15 @@ function AgentListFrame({
   )
 }
 
+const filedDateFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+})
+
 function formatDate(value: Date): string {
-  return value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+  return filedDateFormat.format(value)
 }
 
 function EmptyAgentList() {

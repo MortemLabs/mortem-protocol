@@ -102,8 +102,9 @@ export function buildDepthMap(events: DepthEvent[]): Record<string, number> {
   const cache: Record<string, number> = {}
 
   const depthOf = (event: DepthEvent, seen: Set<string>): number => {
-    if (cache[event.id] !== undefined) {
-      return cache[event.id]
+    const cached = cache[event.id]
+    if (cached !== undefined) {
+      return cached
     }
 
     if (event.parentEventId === null || seen.has(event.id)) {
@@ -142,12 +143,33 @@ export function truncateHash(value: string | null, start = 6, end = 6): string |
   return `${value.slice(0, start)}...${value.slice(-end)}`
 }
 
+// Forensic timestamps are always rendered in UTC so server and client agree (no hydration drift)
+// and every case file reads in one timezone regardless of who opens it.
+const utcDateTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+})
+
+const utcTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+})
+
 export function formatDate(value: Date): string {
-  return value.toLocaleString()
+  return `${utcDateTimeFormat.format(value)} UTC`
 }
 
 export function formatTime(value: Date): string {
-  return value.toLocaleTimeString()
+  return `${utcTimeFormat.format(value)} UTC`
 }
 
 export function formatOffset(start: Date, value: Date): string {

@@ -55,6 +55,12 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <AppChromeContext.Provider value={value}>
       <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-signal focus:bg-ink focus:px-4 focus:py-2 focus:font-mono focus:text-[0.6875rem] focus:uppercase focus:tracking-[0.16em] focus:text-paper"
+        >
+          Skip to content
+        </a>
         <div className="tape h-1 w-full" aria-hidden="true" />
         <header className="border-b border-line">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-6 lg:px-8">

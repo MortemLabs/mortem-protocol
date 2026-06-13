@@ -2,7 +2,7 @@
 // It includes loading, empty, and recovery states so filtering never leaves a blank surface.
 "use client"
 
-import { statusVariant } from "@/components/mortem/trace-format"
+import { formatDate, statusVariant } from "@/components/mortem/trace-format"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -123,7 +123,6 @@ function PreviewTraceList({
 
   return (
     <TraceListFrame
-      agentId={agentId}
       traces={visible}
       status={status}
       setStatus={setStatus}
@@ -201,7 +200,6 @@ function AuthenticatedTraceList({
 
   return (
     <TraceListFrame
-      agentId={agentId}
       traces={traceRows}
       status={status}
       setStatus={setStatus}
@@ -216,7 +214,6 @@ function AuthenticatedTraceList({
 }
 
 function TraceListFrame({
-  agentId,
   hasMore = false,
   loadingMore = false,
   onLoadMore,
@@ -227,7 +224,6 @@ function TraceListFrame({
   tags,
   traces,
 }: Readonly<{
-  agentId: string
   hasMore?: boolean
   loadingMore?: boolean
   onLoadMore?: () => void
@@ -316,7 +312,7 @@ function TraceListFrame({
                 <p className="mt-2 text-sm leading-6">{trace.inputSummary}</p>
                 <p className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-fg-muted">
                   <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                  {trace.startedAt.toLocaleString()}
+                  {formatDate(trace.startedAt)}
                 </p>
               </div>
               <TraceMetric label="Events" value={String(trace.eventCount)} />

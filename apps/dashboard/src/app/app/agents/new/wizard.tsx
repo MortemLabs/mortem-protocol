@@ -497,14 +497,18 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                         rest of your agent flow.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div role="tablist" aria-label="SDK integration" className="flex flex-wrap gap-2">
                       {integrationTabs.map((tab) => (
                         <button
                           key={tab.value}
                           type="button"
+                          role="tab"
+                          id={`integration-tab-${tab.value}`}
+                          aria-selected={activeIntegrationTab === tab.value}
+                          aria-controls="integration-tabpanel"
                           onClick={() => setActiveIntegrationTab(tab.value)}
                           className={cn(
-                            "border px-3 py-2 text-sm font-medium transition",
+                            "border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             activeIntegrationTab === tab.value
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
@@ -514,11 +518,17 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                         </button>
                       ))}
                     </div>
-                    <CodeBlock
-                      label={integrationExample.label}
-                      language="typescript"
-                      value={integrationExample.code}
-                    />
+                    <div
+                      role="tabpanel"
+                      id="integration-tabpanel"
+                      aria-labelledby={`integration-tab-${activeIntegrationTab}`}
+                    >
+                      <CodeBlock
+                        label={integrationExample.label}
+                        language="typescript"
+                        value={integrationExample.code}
+                      />
+                    </div>
                     <div className="border border-signal/60 bg-transparent p-4 text-sm text-signal">
                       The verify token proves you control this agent. You can remove it from your
                       code after Mortem confirms the connection.
@@ -536,8 +546,9 @@ function WizardFrame({ mode }: Readonly<{ mode: "preview" | "private" }>) {
                   <div className="border border-border bg-background">
                     <button
                       type="button"
+                      aria-expanded={isAssistantPromptOpen}
                       onClick={() => setIsAssistantPromptOpen((current) => !current)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -946,11 +957,14 @@ function resolveStepState(
   return currentStep > step ? "complete" : "future"
 }
 
+const wizardDateTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  dateStyle: "medium",
+  timeStyle: "short",
+})
+
 function formatDateTime(value: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value)
+  return `${wizardDateTimeFormat.format(value)} UTC`
 }
 
 function renderHighlightedCode(value: string, language: CodeLanguage): ReactNode[] {
