@@ -1,11 +1,24 @@
 // Public share pages render trace evidence on the server so links remain readable without browser
 // JavaScript. Data is loaded through a public trace read instead of protected dashboard APIs.
 import { CopyButton } from "@/components/mortem/copy-button"
+import {
+  eventHeadline,
+  eventSignature,
+  failureLabel,
+  failureVariant,
+  formatCost,
+  formatDate,
+  formatDuration,
+  formatJson,
+  statusVariant,
+  truncateHash,
+  eventVariant,
+} from "@/components/mortem/trace-format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
 import type { inferRouterOutputs } from "@trpc/server"
-import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react"
+import { AlertCircle, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import superjson from "superjson"
@@ -186,163 +199,4 @@ function ShareStat({ label, value }: Readonly<{ label: string; value: ReactNode 
       <p className="mt-2 break-all font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
-}
-
-function eventHeadline(event: SharedEvent): string {
-  const payload = isRecord(event.payload) ? event.payload : {}
-
-  if (event.type === "llm_call") {
-    const provider = readString(payload, "provider") ?? "llm"
-    const model = readString(payload, "model") ?? "model"
-    return `${provider} · ${model}`
-  }
-
-  if (event.type === "tool_call") {
-    return readString(payload, "toolName") ?? "tool call"
-  }
-
-  if (event.type === "solana_tx") {
-    return truncateHash(readString(payload, "signature")) ?? "solana transaction"
-  }
-
-  if (event.type === "custom") {
-    return readString(payload, "name") ?? "custom event"
-  }
-
-  return event.type
-}
-
-function formatJson(value: unknown): string {
-  return JSON.stringify(value, null, 2) ?? "null"
-}
-
-function truncateHash(value: string | null, start = 6, end = 6): string | null {
-  if (value === null || value.length <= start + end + 1) {
-    return value
-  }
-
-  return `${value.slice(0, start)}...${value.slice(-end)}`
-}
-
-function formatDate(value: Date): string {
-  return value.toLocaleString()
-}
-
-function formatDuration(value: number | null): string {
-  if (value === null) {
-    return "running"
-  }
-
-  if (value < 1000) {
-    return `${value}ms`
-  }
-
-  return `${(value / 1000).toFixed(2)}s`
-}
-
-function formatCost(value: string): ReactNode {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) {
-    return value
-  }
-
-  if (numeric < 0) {
-    return (
-      <Link
-        className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
-        href="https://ollama.com/settings/usage"
-        target="_blank"
-        rel="noreferrer"
-      >
-        usage tracked by Ollama
-        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-      </Link>
-    )
-  }
-
-  return `$${numeric.toFixed(6)}`
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function readString(record: Record<string, unknown>, key: string): string | null {
-  const value = record[key]
-  return typeof value === "string" ? value : null
-}
-
-function eventSignature(event: SharedEvent): string | null {
-  if (event.type !== "solana_tx") {
-    return null
-  }
-
-  const payload = isRecord(event.payload) ? event.payload : {}
-  return readString(payload, "signature")
-}
-
-function statusVariant(
-  status: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (status === "completed") {
-    return "success"
-  }
-
-  if (status === "errored" || status === "timeout") {
-    return "error"
-  }
-
-  if (status === "running") {
-    return "warning"
-  }
-
-  return "secondary"
-}
-
-function eventVariant(
-  type: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (type === "llm_call") {
-    return "default"
-  }
-
-  if (type === "solana_tx") {
-    return "success"
-  }
-
-  if (type === "tool_call" || type === "mcp_call") {
-    return "warning"
-  }
-
-  return "secondary"
-}
-
-function failureVariant(
-  failureType: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (failureType === "none") {
-    return "success"
-  }
-
-  if (failureType === "market_condition" || failureType === "model_limit") {
-    return "warning"
-  }
-
-  if (
-    failureType === "missing_information" ||
-    failureType === "bad_instruction" ||
-    failureType === "guardrail_gap"
-  ) {
-    return "error"
-  }
-
-  return "secondary"
-}
-
-function failureLabel(failureType: string): string {
-  if (failureType === "none") {
-    return "healthy"
-  }
-
-  return failureType.replace(/_/g, " ")
 }

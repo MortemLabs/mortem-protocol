@@ -5,6 +5,29 @@
 import { useRegisterCrumb } from "@/components/app-shell"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { CopyButton } from "@/components/mortem/copy-button"
+import {
+  buildDepthMap,
+  confidenceBand,
+  eventCluster,
+  eventHeadline,
+  eventSignature,
+  eventVariant,
+  explorerTxUrl,
+  failureLabel,
+  failureVariant,
+  formatCost,
+  formatDate,
+  formatDuration,
+  formatJson,
+  formatOffset,
+  formatRelative,
+  formatTime,
+  isRecord,
+  readString,
+  statusVariant,
+  truncateHash,
+  verdictVariant,
+} from "@/components/mortem/trace-format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { usePrivy } from "@privy-io/react-auth"
@@ -233,6 +256,7 @@ function AuthenticatedTraceDetail({ traceId }: Readonly<{ traceId: string }>) {
       await utils.traces.get.invalidate({ id: traceId })
     },
   })
+  const rerun = trpc.analysis.rerun.useMutation()
 
   if (!ready || trace.isLoading) {
     return <TraceDetailSkeleton />
@@ -275,20 +299,29 @@ function AuthenticatedTraceDetail({ traceId }: Readonly<{ traceId: string }>) {
       onShare={() => share.mutate({ id: traceId })}
       onUnshare={() => unshare.mutate({ id: traceId })}
       sharing={share.isPending || unshare.isPending}
+      onRerun={() => rerun.mutate({ traceId })}
+      rerunPending={rerun.isPending}
+      rerunQueued={rerun.isSuccess}
     />
   )
 }
 
 function TraceDetailFrame({
+  onRerun,
   onShare,
   onUnshare,
   preview = false,
+  rerunPending = false,
+  rerunQueued = false,
   sharing = false,
   trace,
 }: Readonly<{
+  onRerun?: () => void
   onShare?: () => void
   onUnshare?: () => void
   preview?: boolean
+  rerunPending?: boolean
+  rerunQueued?: boolean
   sharing?: boolean
   trace: TraceDetailView
 }>) {
@@ -329,8 +362,12 @@ function TraceDetailFrame({
 
         <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_400px]">
           <TraceMetadataPanel
+            onRerun={onRerun}
             onShare={onShare}
             onUnshare={onUnshare}
+            preview={preview}
+            rerunPending={rerunPending}
+            rerunQueued={rerunQueued}
             shareUrl={shareUrl}
             sharing={sharing}
             trace={trace}
@@ -348,14 +385,22 @@ function TraceDetailFrame({
 }
 
 function TraceMetadataPanel({
+  onRerun,
   onShare,
   onUnshare,
+  preview,
+  rerunPending,
+  rerunQueued,
   shareUrl,
   sharing,
   trace,
 }: Readonly<{
+  onRerun: (() => void) | undefined
   onShare: (() => void) | undefined
   onUnshare: (() => void) | undefined
+  preview: boolean
+  rerunPending: boolean
+  rerunQueued: boolean
   shareUrl: string | null
   sharing: boolean
   trace: TraceDetailView
@@ -455,7 +500,14 @@ function TraceMetadataPanel({
         </div>
       </section>
 
-      <TraceAnalysisPanel analysis={trace.analysis} />
+      <TraceAnalysisPanel
+        analysis={trace.analysis}
+        onRerun={onRerun}
+        preview={preview}
+        rerunPending={rerunPending}
+        rerunQueued={rerunQueued}
+        traceStatus={trace.status}
+      />
     </aside>
   )
 }
@@ -720,14 +772,58 @@ function TraceInspectorPanel({
   )
 }
 
-function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView | null }>) {
+function TraceAnalysisPanel({
+  analysis,
+  onRerun,
+  preview,
+  rerunPending,
+  rerunQueued,
+  traceStatus,
+}: Readonly<{
+  analysis: TraceAnalysisView | null
+  onRerun: (() => void) | undefined
+  preview: boolean
+  rerunPending: boolean
+  rerunQueued: boolean
+  traceStatus: string
+}>) {
   if (analysis === null) {
+    const traceClosed = traceStatus !== "running"
+
     return (
       <section className="p-4">
         <h2 className="eyebrow">Autopsy</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Autopsy is queued once the trace completes.
-        </p>
+        {!traceClosed ? (
+          <p className="mt-2 flex items-center gap-2 text-sm leading-6 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            The trace is still open. Autopsy runs once it closes.
+          </p>
+        ) : rerunQueued ? (
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Autopsy queued. It appears here once the analysis worker finishes — refresh in a moment.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              No autopsy has been filed for this trace yet.
+            </p>
+            {preview ? null : (
+              <Button
+                type="button"
+                className="mt-4"
+                disabled={onRerun === undefined || rerunPending}
+                onClick={onRerun}
+              >
+                {rerunPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+                )}
+                Run autopsy
+              </Button>
+            )}
+          </>
+        )}
       </section>
     )
   }
@@ -742,7 +838,7 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
       </div>
       <div className="mt-4">
         <div className="flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          <span>Confidence</span>
+          <span>Confidence · {confidenceBand(analysis.confidence)}</span>
           <span>{Math.round(analysis.confidence * 100)}%</span>
         </div>
         <div className="mt-2 h-2 bg-ink-3">
@@ -762,11 +858,8 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
 
       <div className="mt-5 space-y-2">
         {analysis.counterfactuals.map((item, index) => (
-          <details
-            key={`${item.question}-${index}`}
-            className="border border-line p-3"
-          >
-            <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <details key={`${item.question}-${index}`} className="border border-line p-3">
+            <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {item.question}
             </summary>
             <div className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
@@ -781,6 +874,24 @@ function TraceAnalysisPanel({ analysis }: Readonly<{ analysis: TraceAnalysisView
       <p className="mt-4 text-xs text-muted-foreground">
         {analysis.llmProvider} · {analysis.modelUsed} · {formatDate(analysis.analyzedAt)}
       </p>
+
+      {preview ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-4"
+          disabled={onRerun === undefined || rerunPending || rerunQueued}
+          onClick={onRerun}
+        >
+          {rerunPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+          )}
+          {rerunQueued ? "Autopsy re-queued" : "Rerun autopsy"}
+        </Button>
+      )}
     </section>
   )
 }
@@ -964,72 +1075,6 @@ function buildEventMarkdown(trace: TraceDetailView, event: TraceEventView): stri
   ].join("\n")
 }
 
-function eventHeadline(event: TraceEventView): string {
-  const payload = isRecord(event.payload) ? event.payload : {}
-
-  if (event.type === "llm_call") {
-    const provider = readString(payload, "provider") ?? "llm"
-    const model = readString(payload, "model") ?? "model"
-    return `${provider} · ${model}`
-  }
-
-  if (event.type === "tool_call") {
-    const toolName = readString(payload, "toolName") ?? "tool call"
-    const output = isRecord(payload.output) ? payload.output : null
-    const impact = output === null ? null : readNumber(output, "priceImpactPct")
-    return impact === null ? toolName : `${toolName} · ${impact}% impact`
-  }
-
-  if (event.type === "solana_tx") {
-    const instructions = readStringArray(payload, "instructionNames")
-    const status = readString(payload, "confirmationStatus")
-    const label =
-      instructions.length > 0
-        ? instructions.join(", ")
-        : (truncateHash(readString(payload, "signature")) ?? "solana tx")
-    return status === null ? label : `${label} · ${status}`
-  }
-
-  if (event.type === "custom") {
-    return readString(payload, "name") ?? "custom event"
-  }
-
-  return event.type
-}
-
-function buildDepthMap(events: TraceEventView[]): Record<string, number> {
-  const byId = new Map(events.map((event) => [event.id, event]))
-  const cache: Record<string, number> = {}
-
-  const depthOf = (event: TraceEventView, seen: Set<string>): number => {
-    if (cache[event.id] !== undefined) {
-      return cache[event.id]
-    }
-
-    if (event.parentEventId === null || seen.has(event.id)) {
-      cache[event.id] = 0
-      return 0
-    }
-
-    const parent = byId.get(event.parentEventId)
-    if (parent === undefined) {
-      cache[event.id] = 0
-      return 0
-    }
-
-    seen.add(event.id)
-    const depth = depthOf(parent, seen) + 1
-    cache[event.id] = depth
-    return depth
-  }
-
-  for (const event of events) {
-    depthOf(event, new Set())
-  }
-
-  return cache
-}
-
 function eventSearchText(event: TraceEventView): string {
   return [
     event.type,
@@ -1043,213 +1088,6 @@ function eventSearchText(event: TraceEventView): string {
     .toLowerCase()
 }
 
-function eventCluster(event: TraceEventView): string {
-  const payload = isRecord(event.payload) ? event.payload : {}
-  return readString(payload, "cluster") ?? "devnet"
-}
-
-function explorerTxUrl(signature: string, cluster: string): string {
-  const normalized = cluster === "mainnet" || cluster === "mainnet-beta" ? null : cluster
-  const suffix = normalized === null ? "" : `?cluster=${normalized}`
-  return `https://explorer.solana.com/tx/${signature}${suffix}`
-}
-
-function readNumber(record: Record<string, unknown>, key: string): number | null {
-  const value = record[key]
-  return typeof value === "number" && Number.isFinite(value) ? value : null
-}
-
-function formatJson(value: unknown): string {
-  return JSON.stringify(value, null, 2) ?? "null"
-}
-
-function truncateHash(value: string | null, start = 6, end = 6): string | null {
-  if (value === null || value.length <= start + end + 1) {
-    return value
-  }
-
-  return `${value.slice(0, start)}...${value.slice(-end)}`
-}
-
-function formatDate(value: Date): string {
-  return value.toLocaleString()
-}
-
-function formatTime(value: Date): string {
-  return value.toLocaleTimeString()
-}
-
-function formatOffset(start: Date, value: Date): string {
-  const deltaMs = Math.max(0, value.getTime() - start.getTime())
-  if (deltaMs < 1000) {
-    return `${deltaMs}ms`
-  }
-
-  return `${(deltaMs / 1000).toFixed(2)}s`
-}
-
-function formatRelative(value: Date): string {
-  const deltaMs = Date.now() - value.getTime()
-  const deltaSeconds = Math.round(deltaMs / 1000)
-
-  if (Math.abs(deltaSeconds) < 60) {
-    return "just now"
-  }
-
-  const minutes = Math.round(deltaSeconds / 60)
-  if (Math.abs(minutes) < 60) {
-    return `${minutes}m ago`
-  }
-
-  const hours = Math.round(minutes / 60)
-  if (Math.abs(hours) < 24) {
-    return `${hours}h ago`
-  }
-
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
-}
-
-function formatDuration(value: number | null): string {
-  if (value === null) {
-    return "running"
-  }
-
-  if (value < 1000) {
-    return `${value}ms`
-  }
-
-  return `${(value / 1000).toFixed(2)}s`
-}
-
-function formatCost(value: string): ReactNode {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) {
-    return value
-  }
-
-  if (numeric < 0) {
-    return (
-      <Link
-        className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
-        href="https://ollama.com/settings/usage"
-        target="_blank"
-        rel="noreferrer"
-      >
-        usage tracked by Ollama
-        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-      </Link>
-    )
-  }
-
-  return `$${numeric.toFixed(6)}`
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function readString(record: Record<string, unknown>, key: string): string | null {
-  const value = record[key]
-  return typeof value === "string" ? value : null
-}
-
-function eventSignature(event: TraceEventView): string | null {
-  if (event.type !== "solana_tx") {
-    return null
-  }
-
-  const payload = isRecord(event.payload) ? event.payload : {}
-  return readString(payload, "signature")
-}
-
-function readStringArray(record: Record<string, unknown>, key: string): string[] {
-  const value = record[key]
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : []
-}
-
 function readVerdict(value: unknown): CounterfactualView["verdict"] | null {
   return value === "avoidable" || value === "unavoidable" || value === "unclear" ? value : null
-}
-
-function statusVariant(
-  status: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (status === "completed") {
-    return "success"
-  }
-
-  if (status === "errored" || status === "timeout") {
-    return "error"
-  }
-
-  if (status === "running") {
-    return "warning"
-  }
-
-  return "secondary"
-}
-
-function eventVariant(
-  type: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (type === "llm_call") {
-    return "default"
-  }
-
-  if (type === "solana_tx") {
-    return "success"
-  }
-
-  if (type === "tool_call" || type === "mcp_call") {
-    return "warning"
-  }
-
-  return "secondary"
-}
-
-function failureVariant(
-  failureType: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (failureType === "none") {
-    return "success"
-  }
-
-  if (failureType === "market_condition" || failureType === "model_limit") {
-    return "warning"
-  }
-
-  if (
-    failureType === "missing_information" ||
-    failureType === "bad_instruction" ||
-    failureType === "guardrail_gap"
-  ) {
-    return "error"
-  }
-
-  return "secondary"
-}
-
-function failureLabel(failureType: string): string {
-  if (failureType === "none") {
-    return "healthy"
-  }
-
-  return failureType.replace(/_/g, " ")
-}
-
-function verdictVariant(
-  verdict: CounterfactualView["verdict"],
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (verdict === "avoidable") {
-    return "error"
-  }
-
-  if (verdict === "unavoidable") {
-    return "success"
-  }
-
-  return "warning"
 }

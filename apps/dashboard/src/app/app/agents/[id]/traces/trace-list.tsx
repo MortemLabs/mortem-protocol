@@ -2,6 +2,7 @@
 // It includes loading, empty, and recovery states so filtering never leaves a blank surface.
 "use client"
 
+import { statusVariant } from "@/components/mortem/trace-format"
 import { trpc, useDashboardAuth } from "@/components/providers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -298,22 +299,4 @@ function TraceMetric({ label, value }: Readonly<{ label: string; value: string }
       <p className="mt-1 font-mono text-sm tabular-nums">{value}</p>
     </div>
   )
-}
-
-function statusVariant(
-  status: string,
-): "default" | "error" | "outline" | "secondary" | "success" | "warning" {
-  if (status === "completed") {
-    return "success"
-  }
-
-  if (status === "errored" || status === "timeout") {
-    return "error"
-  }
-
-  if (status === "running") {
-    return "warning"
-  }
-
-  return "secondary"
 }
