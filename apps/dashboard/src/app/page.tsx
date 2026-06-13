@@ -304,8 +304,8 @@ export default function LandingPage() {
             Bring your worst trade. We'll show you exactly what happened.
           </p>
           <div className="mt-8 flex justify-center">
-            <Button asChild size="lg">
-              <Link href="/app">Start a Free Autopsy</Link>
+            <Button asChild size="lg" variant="brand">
+              <Link href="/app">Start an autopsy</Link>
             </Button>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
@@ -313,8 +313,50 @@ export default function LandingPage() {
           </p>
         </section>
 
-        <footer className="border-t border-line py-6">
-          <p className="case-meta text-center text-fg-muted">☩ Ship · Learn · Bury · Repeat ☩</p>
+        <footer className="mt-12 border-t border-line pt-8 pb-6">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Mark size={24} alt="Mortem" />
+              <span className="font-display text-2xl leading-none">
+                Mortem<span className="text-signal">.</span>
+              </span>
+            </Link>
+            <nav
+              className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground"
+              aria-label="Footer"
+            >
+              <Link href="/app" className="transition-colors hover:text-foreground">
+                Workspace
+              </Link>
+              <Link
+                href="https://github.com/MortemLabs/mortem-protocol"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+              >
+                GitHub
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <Link
+                href="https://cal.com/ifeelsam"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+              >
+                Book a demo
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </nav>
+          </div>
+          <div className="mt-6 flex flex-col gap-2 border-t border-line pt-6 text-center md:flex-row md:items-center md:justify-between md:text-left">
+            <p className="case-meta text-fg-muted">
+              © {new Date().getFullYear()} Mortem Labs
+            </p>
+            <p className="case-meta text-fg-muted">☩ Ship · Learn · Bury · Repeat ☩</p>
+          </div>
         </footer>
       </div>
     </main>
@@ -333,7 +375,7 @@ function TraceMoment({
   return (
     <article className="bg-ink-2 p-5">
       <p className="case-meta text-fg-muted">{meta}</p>
-      <h2 className="mt-3 font-display text-3xl leading-tight text-signal">{label}</h2>
+      <p className="mt-3 font-display text-3xl leading-tight text-signal">{label}</p>
       <div className="mt-4 border-l-2 border-signal pl-4">
         <p className="text-sm leading-6 text-foreground">{detail}</p>
       </div>

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
 import type { inferRouterOutputs } from "@trpc/server"
 import { AlertCircle, ArrowLeft } from "lucide-react"
+import type { Metadata } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import superjson from "superjson"
@@ -40,6 +41,35 @@ const publicClient = createTRPCProxyClient<AppRouter>({
     }),
   ],
 })
+
+export async function generateMetadata({
+  params,
+}: Readonly<{ params: Promise<{ token: string }> }>): Promise<Metadata> {
+  const { token } = await params
+  const data = await getSharedTrace(token)
+
+  if (data === null) {
+    return {
+      title: "Shared autopsy not found",
+      description: "This shared Mortem trace has been disabled or the link is wrong.",
+      robots: { index: false, follow: false },
+    }
+  }
+
+  const verdict =
+    data.analysis === null
+      ? `${data.eventCount} events filed`
+      : `${failureLabel(data.analysis.failureType)} — ${data.status}`
+  const title = `Autopsy: ${data.inputSummary}`
+  const description = `${verdict}. ${data.eventCount} events, ${data.solanaTxCount} Solana txs, ${data.totalTokens} tokens.`
+
+  return {
+    title,
+    description,
+    openGraph: { type: "article", title, description },
+    twitter: { card: "summary_large_image", title, description },
+  }
+}
 
 export default async function SharePage({
   params,
@@ -131,6 +161,22 @@ export default async function SharePage({
             </div>
           </section>
         </section>
+
+        <section className="mt-6 flex flex-col gap-4 border border-line bg-ink-2 p-6 text-card-foreground md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="eyebrow">Run your own</p>
+            <h2 className="mt-2 font-display text-2xl leading-tight">
+              File an autopsy on every agent run.
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+              Mortem traces each onchain decision, names the cause of death, and hands you the fix
+              before the next trade.
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/app">Start an autopsy</Link>
+          </Button>
+        </section>
       </div>
     </main>
   )
@@ -147,13 +193,23 @@ async function getSharedTrace(token: string): Promise<ShareResult> {
 function ShareMessage({ token }: Readonly<{ token: string }>) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8 text-foreground">
+      <div className="tape absolute inset-x-0 top-0 h-2 w-full" aria-hidden="true" />
       <section className="w-full max-w-md border border-line bg-ink-2 p-6 text-card-foreground">
-        <AlertCircle className="h-5 w-5 text-signal" aria-hidden="true" />
+        <p className="case-meta">Case closed</p>
+        <AlertCircle className="mt-4 h-5 w-5 text-signal" aria-hidden="true" />
         <h1 className="mt-4 font-display text-2xl leading-tight">Shared trace buried</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          The link may have been disabled or the token may be wrong.
+          The link may have been disabled or the token may be wrong. Nothing left to examine here.
         </p>
         <p className="mt-3 break-all font-mono text-xs text-muted-foreground">{token}</p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/">Open Mortem</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/app">Go to workspace</Link>
+          </Button>
+        </div>
       </section>
     </main>
   )

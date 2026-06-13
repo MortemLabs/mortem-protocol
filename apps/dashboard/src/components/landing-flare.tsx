@@ -12,6 +12,11 @@ export function LandingFlare() {
   const flareRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Respect reduced-motion: leave the static centered flare, skip pointer tracking.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return
+    }
+
     let frame = 0
 
     function setGridFocus(x: number, y: number, opacity = "0.86") {

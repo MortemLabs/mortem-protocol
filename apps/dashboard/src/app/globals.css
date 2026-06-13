@@ -270,3 +270,19 @@ button {
   content: "●";
   margin-right: 0.4em;
 }
+
+/* Mortem's motion is clinical: when the reader asks for less, remove all of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .landing-flare__grid-focus {
+    transition: none;
+  }
+}
