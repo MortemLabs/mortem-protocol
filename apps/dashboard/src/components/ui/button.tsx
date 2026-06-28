@@ -1,6 +1,4 @@
 import { cn } from "@/lib/utils"
-// Brutal square buttons per Mortem brand. Mono uppercase by default — the body
-// is sans, but click targets read as case-file labels.
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps, cva } from "class-variance-authority"
 import type * as React from "react"
