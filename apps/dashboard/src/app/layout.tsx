@@ -30,7 +30,7 @@ const siteUrl = process.env.NEXT_PUBLIC_MORTEM_SITE_URL ?? "https://mortem.dev"
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Mortem — Forensics for onchain trading agents",
+    default: "Mortem · Forensics for onchain trading agents",
     template: "%s · Mortem",
   },
   description:
@@ -44,14 +44,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Mortem",
-    title: "Mortem — Forensics for onchain trading agents",
+    title: "Mortem · Forensics for onchain trading agents",
     description:
       "File an autopsy on every agent run: full traces, cause of death, and the fix — before the next trade.",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mortem — Forensics for onchain trading agents",
+    title: "Mortem · Forensics for onchain trading agents",
     description:
       "File an autopsy on every agent run: full traces, cause of death, and the fix — before the next trade.",
   },
