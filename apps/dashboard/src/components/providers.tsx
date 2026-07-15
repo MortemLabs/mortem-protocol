@@ -22,14 +22,13 @@ const trpcUrl = process.env.NEXT_PUBLIC_MORTEM_SERVER_URL ?? "http://localhost:3
 const privyConfig = {
   appearance: {
     landingHeader: "Sign in to Mortem",
-    loginMessage: "Use email or a Solana wallet to inspect agent traces.",
-    walletChainType: "solana-only",
+    loginMessage: "Use email to inspect agent traces.",
   },
   legal: {
     privacyPolicyUrl: null,
     termsAndConditionsUrl: null,
   },
-  loginMethods: ["email", "wallet"],
+  loginMethods: ["email"],
 } satisfies NonNullable<Parameters<typeof PrivyProvider>[0]["config"]>
 
 export function useDashboardAuth() {
