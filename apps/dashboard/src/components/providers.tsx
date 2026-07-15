@@ -24,7 +24,6 @@ const privyConfig = {
     accentColor: "#DC2626",
     landingHeader: "Sign in to Mortem",
     logo: "/mortem-icon.svg",
-    loginMessage: "Use email or a Solana wallet to inspect agent traces.",
     theme: "#0E0D0C",
     walletChainType: "solana-only",
   },
