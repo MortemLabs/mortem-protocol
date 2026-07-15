@@ -21,8 +21,11 @@ const DashboardAuthContext = createContext<DashboardAuthState>({ privyEnabled: f
 const trpcUrl = process.env.NEXT_PUBLIC_MORTEM_SERVER_URL ?? "http://localhost:3001/api/trpc"
 const privyConfig = {
   appearance: {
+    accentColor: "#DC2626",
     landingHeader: "Sign in to Mortem",
+    logo: "/mortem-icon.svg",
     loginMessage: "Use email or a Solana wallet to inspect agent traces.",
+    theme: "#0E0D0C",
     walletChainType: "solana-only",
   },
   legal: {
