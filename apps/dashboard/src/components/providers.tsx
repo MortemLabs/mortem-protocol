@@ -29,7 +29,7 @@ const privyConfig = {
     privacyPolicyUrl: null,
     termsAndConditionsUrl: null,
   },
-  loginMethods: ["email", "wallet"],
+  loginMethods: ["google", "email", "wallet"],
 } satisfies NonNullable<Parameters<typeof PrivyProvider>[0]["config"]>
 
 export function useDashboardAuth() {
