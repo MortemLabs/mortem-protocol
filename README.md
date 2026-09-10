@@ -521,6 +521,54 @@ cannot be decrypted.
 - The server verifies Privy JWTs with `verifyAuthToken` only.
 - Anchor worker: decoupled from the default pipeline; see [apps/anchor-worker/README.md](apps/anchor-worker/README.md).
 
+## Containers
+
+The root `Dockerfile` has a target for each deployable service. Build only the service you need,
+then provide its environment through your deployment platform's secret store:
+
+```bash
+# Dashboard
+docker build --target dashboard \
+  --build-arg NEXT_PUBLIC_PRIVY_APP_ID \
+  --build-arg NEXT_PUBLIC_MORTEM_SERVER_URL \
+  --build-arg NEXT_PUBLIC_MORTEM_INGEST_URL \
+  --build-arg NEXT_PUBLIC_MORTEM_SITE_URL \
+  -t mortem-dashboard .
+docker run --env-file .env.local -p 3000:3000 mortem-dashboard
+
+# API server
+docker build --target server -t mortem-server .
+docker run --env-file .env.local -p 3001:3001 mortem-server
+
+# Trace ingestion service
+docker build --target ingest -t mortem-ingest .
+docker run --env-file .env.local -p 4001:4001 mortem-ingest
+```
+
+The enrichment worker can be built with `--target enrichment-worker`. Apply Prisma migrations as
+a one-off release task before starting application containers:
+
+```bash
+docker run --rm --env-file .env.local mortem-server \
+  pnpm --filter @mortemlabs/db exec prisma migrate deploy
+```
+
+For local containers, Compose reads each service's own `.env.local` file, so server and worker
+secrets are not injected into the dashboard or ingest service. Create those files from their
+examples, then run:
+
+```bash
+docker compose --env-file apps/dashboard/.env.local up --build
+```
+
+The explicit `--env-file` provides only the dashboard's public build values to Compose. It is not
+passed to other containers; `compose.yaml` uses each service's `env_file` entry at runtime. Start
+the optional enrichment worker with `docker compose --env-file apps/dashboard/.env.local --profile workers up --build`.
+
+The dashboard's `NEXT_PUBLIC_*` values are supplied as Docker build arguments because Next.js
+bundles them into browser code. All other configuration, including secrets, is passed only at
+container start with each service's `env_file` locally (or the deployment platform's secret injection).
+
 ## Troubleshooting
 
 If the dashboard shows no private data:
